@@ -49,6 +49,7 @@ input,select{font:16px "Noto Sans TC",sans-serif;background:#0d100f;color:var(--
 .setp{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:#0b0e0d;border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin:0 0 10px}
 .setp label{font-size:14px}
 .tw{position:relative;width:100%;aspect-ratio:16/10;margin:46px auto 30px;max-width:1000px}
+.tw.tt{margin-bottom:64px}
 .rim{position:absolute;inset:9% 6% 10%;border-radius:50%;background:linear-gradient(160deg,#6b3a1c,#3a1c0c 40%,#5a2e14 70%,#2a1206);box-shadow:0 30px 50px -10px #000c,inset 0 2px 0 #ffffff30,inset 0 -3px 0 #0008}
 .rim::before{content:"";position:absolute;inset:7px;border-radius:50%;border:2px solid var(--gold2);box-shadow:0 0 0 1px #0006,inset 0 0 0 1px #0006}
 .oval{position:absolute;inset:calc(9% + 18px) calc(6% + 18px) calc(10% + 18px);border-radius:50%;background:radial-gradient(70% 70% at 50% 40%,#16805f 0%,var(--felt) 45%,var(--felt2) 100%);box-shadow:inset 0 0 50px #000a,inset 0 0 0 2px #ffffff10;overflow:hidden}
@@ -162,13 +163,31 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:now
 .tw.tt .oval::after{content:"推筒子"}
 .gtag{font-size:12px;padding:2px 9px;border-radius:99px;font-weight:700;white-space:nowrap}
 .gtag.nn{background:#6e1423;color:#ffe3b0;border:1px solid #b53a49}.gtag.tt{background:#123d2c;color:#bff5d9;border:1px solid #2e7a57}
-.card.tile{height:calc(var(--w)*1.36)}
-.seat .card.tile+.card.tile{margin-left:5px}
-.tile .cback,.tile .cf{border-radius:calc(var(--w)*.14)}
-.tile .cf{background:linear-gradient(160deg,#fffef8,#f4ecd8 70%,#e8dcc0);box-shadow:inset 0 0 0 1px #fff,0 calc(var(--w)*.09) 0 #0f6b45,0 calc(var(--w)*.09 + 1px) 0 #094a30,0 calc(var(--w)*.14) 8px #000a}
-.tile .cback{background:linear-gradient(160deg,#29a36e,#127a4e 60%,#0d5c3a);box-shadow:inset 0 0 0 1px #6fd3a4,inset 0 2px 0 #9ff0c8aa,0 calc(var(--w)*.09) 0 #efe6cf,0 calc(var(--w)*.09 + 1px) 0 #bfb08a,0 calc(var(--w)*.14) 8px #000a}
+.card.tile{height:calc(var(--w)*1.32)}
+.seat .card.tile+.card.tile{margin-left:calc(var(--w)*.12)}
+.tile .cback,.tile .cf{border-radius:calc(var(--w)*.13)}
+.tile .cf,.mj .lb{background:radial-gradient(120% 90% at 30% 12%,#ffffff 0%,#fbf6e9 45%,#efe4c9 100%);
+ box-shadow:inset 0 0 0 1px #fffdf6,inset 0 calc(var(--w)*.03) 0 #fff,inset 0 calc(var(--w)*-.05) calc(var(--w)*.06) #b9a37a55,
+ 0 calc(var(--w)*.04) 0 #f1e8d2,0 calc(var(--w)*.07) 0 #d6c7a0,0 calc(var(--w)*.10) 0 #1c8f5f,0 calc(var(--w)*.135) 0 #11704a,0 calc(var(--w)*.15) 0 #0a4d32,0 calc(var(--w)*.2) calc(var(--w)*.2) #000b}
+.tile .cback,.mj .lf{background:radial-gradient(120% 90% at 30% 12%,#3cc48a 0%,#169063 40%,#0d6a45 100%);
+ box-shadow:inset 0 0 0 1px #7fe0b4,inset 0 calc(var(--w)*.03) 0 #b4f5d655,inset 0 calc(var(--w)*-.05) calc(var(--w)*.06) #00000040,
+ 0 calc(var(--w)*.04) 0 #12754c,0 calc(var(--w)*.07) 0 #0c5838,0 calc(var(--w)*.10) 0 #f3ead4,0 calc(var(--w)*.135) 0 #d8c9a2,0 calc(var(--w)*.15) 0 #b9a57a,0 calc(var(--w)*.2) calc(var(--w)*.2) #000b}
 .tile .cf::after{display:none}
-.p0 .card.tile{--w:56px}.seat:not(.p0) .card.tile{--w:38px}
+.tile .cf svg{filter:url(#eng)}
+/* 掀牌 */
+.mj{perspective:calc(var(--w)*5);cursor:grab;touch-action:none;outline:none}
+.mj .ci{transform:none!important;animation:none!important}
+.mj .cf{transform:none}
+.mj .shade{position:absolute;inset:0;border-radius:calc(var(--w)*.13);background:linear-gradient(180deg,#000c,#0006 60%,#0000);opacity:calc((1 - var(--lift,0))*.9);pointer-events:none}
+.mj .lid{position:absolute;inset:0;transform-origin:50% 0;transform:rotateX(calc(var(--lift,0)*172deg));transform-style:preserve-3d;transition:transform .35s cubic-bezier(.3,.7,.3,1),opacity .3s .25s}
+.mj.drag .lid{transition:none}
+.mj .lf,.mj .lb{position:absolute;inset:0;border-radius:calc(var(--w)*.13);backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.mj .lb{transform:rotateX(180deg)}
+.mj.opened{cursor:default}.mj.opened .lid{opacity:0}
+.mj:not(.opened) .lf::after{content:"↑";position:absolute;left:50%;bottom:8%;transform:translateX(-50%);color:#d9ffe9;font:900 calc(var(--w)*.3) "Noto Sans TC";opacity:.8;animation:hint 1.2s ease-in-out infinite}
+@keyframes hint{50%{transform:translate(-50%,-25%);opacity:.35}}
+.mj:focus-visible .lf{outline:3px solid var(--gold);outline-offset:3px}
+.p0 .card.tile{--w:72px}.seat:not(.p0) .card.tile{--w:40px}
 .card.flip .ci{animation-delay:var(--f,var(--d,0ms))}
 .dice{display:flex;gap:10px}
 .die{width:34px;height:34px;border-radius:8px;background:linear-gradient(150deg,#fff,#e9e3d6);box-shadow:inset 0 -3px 0 #0002,0 4px 8px #0008;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:5px;gap:1px}
@@ -195,7 +214,8 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:now
  .scards{min-height:34px}
  .pl{left:17%;top:47%}.pr{left:83%;top:47%}
  .tw.tt .center{width:34%}
- .p0 .card.tile{--w:46px}.seat:not(.p0) .card.tile{--w:30px}
+ .p0 .card.tile{--w:56px}.seat:not(.p0) .card.tile{--w:30px}
+ .tw.tt{margin-bottom:56px}
  .die{width:26px;height:26px;padding:4px;border-radius:6px}.wallv{max-width:96px}.wallv i{width:7px;height:10px}
  table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--line)}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:6.5em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:6em;margin-inline-start:-6.5em;color:var(--dim)}
 }
@@ -218,6 +238,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:now
       <ellipse cx="50" cy="70" rx="20" ry="26" fill="#6b0f1c" stroke="#f3d9a0" stroke-width="2"/>
       <path d="M50 52 L58 70 L50 88 L42 70Z" fill="#e7c46a"/><circle cx="50" cy="70" r="4" fill="#6b0f1c"/>
     </symbol>
+    <filter id="eng" x="-5%" y="-5%" width="110%" height="115%"><feOffset in="SourceAlpha" dx="0" dy=".9" result="o"/><feFlood flood-color="#fff" flood-opacity=".95"/><feComposite in2="o" operator="in" result="hl"/><feOffset in="SourceAlpha" dx="0" dy="-.5" result="o2"/><feFlood flood-color="#5a4a2a" flood-opacity=".35"/><feComposite in2="o2" operator="in" result="sh"/><feMerge><feMergeNode in="sh"/><feMergeNode in="hl"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
     <symbol id="chip" viewBox="0 0 40 40">
       <circle cx="20" cy="20" r="19" fill="#b8902f"/>
       <circle cx="20" cy="20" r="17" fill="#e7c46a"/>
@@ -333,7 +354,7 @@ const AVC=[['#b3263a','#5e0f1c'],['#2b7a5e','#0f3d2e'],['#2f5fa8','#132b52'],['#
 const RM=matchMedia('(prefers-reduced-motion: reduce)');
 let token=null;try{token=localStorage.getItem('nn-token')}catch(e){}
 let sock=null,me=null,lobby=[],table=null,hand=null,adm=null,view='lobby',skew=0,regMode=false,toastT=0;
-let seatEls=[],fxRound=-1,dealRound=-1;
+let seatEls=[],fxRound=-1,dealRound=-1,thand=null,opened={round:-1,ks:new Set()};
 
 function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600)}
 function show(v){view=v;for(const k of ['lobby','table','chips','admin'])$('#v-'+k).hidden=k!==v;document.querySelectorAll('nav .btn').forEach(b=>b.classList.toggle('on',b.dataset.v===v||(v==='table'&&b.dataset.v==='lobby')))}
@@ -361,6 +382,7 @@ function connect(){
   sock.on('lobby',d=>{lobby=d;renderLobby();renderAdmin()});
   sock.on('table',d=>{if(view!=='table'||(table&&table.id&&d.id!==table.id))return;table=d;skew=Date.now()-d.now;renderTable()});
   sock.on('hand',d=>{hand=d;renderTable()});
+  sock.on('thand',d=>{thand=d;renderTable()});
   sock.on('admin',d=>{adm=d;renderAdmin();renderMe()});
   sock.on('toast',toast);
   sock.on('kicked',()=>{toast('這張牌桌已被管理員刪除');table=null;show('lobby')});
@@ -488,14 +510,13 @@ function commonSettings(t,grabLabel,unit){
   if($('#serSel')._h!==so){$('#serSel').innerHTML=so;$('#serSel')._h=so}
   $('#grabSel').value=String(t.grabSec);$('#grabSel').disabled=!isOwner||!(t.phase==='idle'||t.phase==='done');
   $('#serSel').value=String(t.seriesTotal);$('#serSel').disabled=!isOwner||inSeries;
-  const tt=t.game==='tuitong';$('#maxSel').hidden=!tt;$('#maxLab').hidden=!tt;
-  if(tt){const mo=[5,10,20].map(x=>`<option value="${x}">${fmt(t.base*x)}（${x} 倍）</option>`).join('');if($('#maxSel')._h!==mo){$('#maxSel').innerHTML=mo;$('#maxSel')._h=mo}$('#maxSel').value=String(t.maxX);$('#maxSel').disabled=!isOwner||!(t.phase==='idle'||t.phase==='done')}
   $('#setHint').textContent=isOwner?`${unit}數要在這一輪打完後才能改`:'由房主設定，你只能查看';
 }
 
 // ---------- 推筒子：麻將牌 ----------
 const TC={B:'#1d4fa3',G:'#17844a',R:'#c8202f'};
-function dot(x,y,r,c){c=TC[c];return `<circle cx="${x}" cy="${y}" r="${r}" fill="${c}"/><circle cx="${x}" cy="${y}" r="${r*.78}" fill="#fffaf0"/><circle cx="${x}" cy="${y}" r="${r*.6}" fill="none" stroke="${c}" stroke-width="${r*.17}"/><circle cx="${x}" cy="${y}" r="${r*.3}" fill="${c}"/><circle cx="${x}" cy="${y}" r="${r*.11}" fill="#fffaf0"/>`}
+function dot(x,y,r,c){c=TC[c];let pet='';for(let k=0;k<8;k++){const a=k*Math.PI/4;pet+=`<circle cx="${(x+Math.cos(a)*r*.34).toFixed(2)}" cy="${(y+Math.sin(a)*r*.34).toFixed(2)}" r="${(r*.12).toFixed(2)}" fill="${c}"/>`}
+  return `<circle cx="${x}" cy="${y}" r="${r}" fill="${c}"/><circle cx="${x}" cy="${y}" r="${r*.8}" fill="#fbf6e9"/><circle cx="${x}" cy="${y}" r="${r*.66}" fill="${c}"/><circle cx="${x}" cy="${y}" r="${r*.53}" fill="#fbf6e9"/>${pet}<circle cx="${x}" cy="${y}" r="${r*.14}" fill="${c}"/>`}
 const TLAY={2:[[30,22,13,'G'],[30,58,13,'B']],3:[[16,16,10,'B'],[30,40,10,'R'],[44,64,10,'G']],4:[[17,22,11,'B'],[43,22,11,'G'],[17,58,11,'G'],[43,58,11,'B']],
  5:[[16,17,10,'B'],[44,17,10,'G'],[30,40,10,'R'],[16,63,10,'G'],[44,63,10,'B']],6:[[18,15,9,'G'],[42,15,9,'G'],[18,44,9,'R'],[42,44,9,'R'],[18,66,9,'R'],[42,66,9,'R']],
  7:[[12,12,7.5,'G'],[30,20,7.5,'G'],[48,28,7.5,'G'],[18,49,8,'R'],[42,49,8,'R'],[18,68,8,'R'],[42,68,8,'R']],
@@ -503,11 +524,12 @@ const TLAY={2:[[30,22,13,'G'],[30,58,13,'B']],3:[[16,16,10,'B'],[30,40,10,'R'],[
  9:[[13,16,8,'B'],[30,16,8,'B'],[47,16,8,'B'],[13,40,8,'R'],[30,40,8,'R'],[47,40,8,'R'],[13,64,8,'G'],[30,64,8,'G'],[47,64,8,'G']]};
 const TCACHE=new Map();
 function tileSVG(v){if(TCACHE.has(v))return TCACHE.get(v);let b='';
-  if(v===0)b=`<rect x="9" y="10" width="42" height="60" rx="3" fill="none" stroke="#2563c9" stroke-width="3"/><rect x="14" y="15" width="32" height="50" rx="2" fill="none" stroke="#2563c9" stroke-width="1" stroke-opacity=".6"/>`;
-  else if(v===1){let pet='';for(let k=0;k<16;k++){const a=k*Math.PI/8;pet+=`<circle cx="${30+Math.cos(a)*21}" cy="${40+Math.sin(a)*21}" r="2.4" fill="${k%2?TC.G:TC.B}"/>`}
-    b=`<circle cx="30" cy="40" r="25" fill="none" stroke="${TC.G}" stroke-width="2"/>${pet}<circle cx="30" cy="40" r="17" fill="${TC.B}"/><circle cx="30" cy="40" r="14" fill="#fffaf0"/>${dot(30,40,12,'R')}`}
+  if(v===0)b=`<rect x="10" y="11" width="40" height="58" rx="3" fill="none" stroke="#2563c9" stroke-width="3.2"/><rect x="15" y="16" width="30" height="48" rx="1.5" fill="none" stroke="#2563c9" stroke-width="1.1"/>`;
+  else if(v===1){let pet='';for(let k=0;k<16;k++){const a=k*Math.PI/8;pet+=`<ellipse cx="${(30+Math.cos(a)*22).toFixed(2)}" cy="${(40+Math.sin(a)*22).toFixed(2)}" rx="2.2" ry="3.4" transform="rotate(${k*22.5+90} ${(30+Math.cos(a)*22).toFixed(2)} ${(40+Math.sin(a)*22).toFixed(2)})" fill="${k%2?TC.G:TC.B}"/>`}
+    b=`<circle cx="30" cy="40" r="26.5" fill="none" stroke="${TC.G}" stroke-width="1.6"/>${pet}<circle cx="30" cy="40" r="18" fill="none" stroke="${TC.B}" stroke-width="3"/>${dot(30,40,14.5,'R')}`}
   else b=TLAY[v].map(([x,y,r,c])=>dot(x,y,r,c)).join('');
-  const svg=`<svg viewBox="0 0 60 80" aria-label="${v===0?'白板':v+'筒'}">${b}</svg>`;TCACHE.set(v,svg);return svg}
+  const svg=`<svg viewBox="0 0 60 80" aria-label="${v===0?'白板':v+'筒'}"><rect x="2.5" y="2.5" width="55" height="75" rx="6" fill="none" stroke="#d8caa3" stroke-width=".7" opacity=".8"/>${b}</svg>`;TCACHE.set(v,svg);return svg}
+function mjTile(v,k,opened,deal,d){return `<div class="card tile mj${opened?' opened':''}${deal?' deal':''}" data-k="${k}" tabindex="0" role="button" aria-label="掀開第 ${k+1} 張牌" style="--d:${d||0}ms;--lift:${opened?1:0}"><div class="ci"><div class="cf">${tileSVG(v)}</div><div class="shade"></div></div><div class="lid"><div class="lf"></div><div class="lb"></div></div></div>`}
 function tile(v,cls,d,f){return `<div class="card tile${cls}" style="--d:${d||0}ms;--f:${f||0}ms"><div class="ci"><div class="cback"></div>${v!=null?`<div class="cf">${tileSVG(v)}</div>`:''}</div></div>`}
 const DIEP={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
 function die(v,roll,dl){return `<div class="die${v===1||v===4?' red':''}${roll?' roll':''}" style="animation-delay:${dl||0}ms">${[0,1,2,3,4,5,6,7,8].map(k=>`<i class="${DIEP[v].includes(k)?'on':''}"></i>`).join('')}</div>`}
@@ -519,15 +541,17 @@ function renderTT(){
   $('#tw').classList.add('tt');$('#deck').hidden=true;$('#rules').textContent=RULES_TT;
   commonSettings(t,'下注考慮時間','把');
   $('#rname').textContent=t.name;
-  $('#rsub').textContent=`推筒子 · 下注 ${fmt(t.base)}～${fmt(t.maxBet)} · ${inSeries?`本輪第 ${t.seriesNo}/${t.seriesTotal} 把`:`每輪 ${t.seriesTotal} 把`}${own?' · 房主 '+own.name:''}`;
+  $('#rsub').textContent=`推筒子 · 底注 ${fmt(t.base)}（下注 ${fmt(t.base)}～${fmt(t.maxBet)}）· ${inSeries?`本輪第 ${t.seriesNo}/${t.seriesTotal} 把`:`每輪 ${t.seriesTotal} 把`}${own?' · 房主 '+own.name:''}`;
   const bk=t.seats.find(s=>s.uid===t.banker),first=t.phase==='done'&&fxRound!==t.round;
-  $('#phase').textContent=t.phase==='done'?(inSeries&&t.seriesNo<t.seriesTotal?'本把結算':'本輪結束'):t.phase==='tbet'?'閒家下注':(t.seats.length?'等待準備':'虛位以待');
+  if(t.phase==='peek'&&opened.round!==t.round)opened={round:t.round,ks:new Set()};
+  const firstPeek=t.phase==='peek'&&dealRound!==t.round;
+  $('#phase').textContent=t.phase==='done'?(inSeries&&t.seriesNo<t.seriesTotal?'本把結算':'本輪結束'):t.phase==='tbet'?'閒家下注':t.phase==='peek'?'看牌':(t.seats.length?'等待準備':'虛位以待');
   const st0=t.seats.find(s=>s.uid===t.startUid);
-  $('#csub').textContent=t.phase==='tbet'?`莊家 ${bk?bk.name:''} · 本副第 ${t.shoeHand}/4 把`:t.phase==='done'&&t.dice?`${t.dice[0]+t.dice[1]} 點，從 ${st0?st0.name:''} 開始發牌`:t.phase==='idle'?`${t.seats.length}/4 人入座`:'';
-  const showWall=(t.phase==='tbet'||t.phase==='done')&&t.wall!=null;$('#wallv').hidden=!showWall;
+  $('#csub').textContent=t.phase==='tbet'?`莊家 ${bk?bk.name:''} · 本副第 ${t.shoeHand}/4 把`:t.phase==='peek'&&t.dice?`${t.dice[0]+t.dice[1]} 點，從 ${st0?st0.name:''} 開始發牌`:t.phase==='done'?`莊家 ${bk?bk.name:''}`:t.phase==='idle'?`${t.seats.length}/4 人入座`:'';
+  const showWall=(t.phase==='tbet'||t.phase==='peek'||t.phase==='done')&&t.wall!=null;$('#wallv').hidden=!showWall;
   if(showWall){const w=`<i></i>`.repeat(Math.ceil(t.wall/2));if($('#wallv')._h!==w){$('#wallv').innerHTML=w;$('#wallv')._h=w}}
-  $('#dice').hidden=!(t.phase==='done'&&t.dice);
-  if(t.phase==='done'&&t.dice&&first){$('#dice').innerHTML=die(t.dice[0],!RM.matches,0)+die(t.dice[1],!RM.matches,90)}
+  $('#dice').hidden=!((t.phase==='peek'||t.phase==='done')&&t.dice);
+  if(t.dice&&(firstPeek||(t.phase==='done'&&!$('#dice').innerHTML))){$('#dice').innerHTML=die(t.dice[0],firstPeek&&!RM.matches,0)+die(t.dice[1],firstPeek&&!RM.matches,90)}
   // seats
   const seats=[...t.seats],mi=seats.findIndex(s=>s.uid===uid);const order=mi>0?[...seats.slice(mi),...seats.slice(0,mi)]:seats;if(mi<0)order.unshift(null);
   const res={};(t.results||[]).forEach(r=>res[r.uid]=r);
@@ -537,17 +561,23 @@ function renderTT(){
     if(!s){el.className='seat '+pos;part(el,'.sinfo-w',i===0&&mi<0?'':'<div class="emptyseat">空位</div>');part(el,'.scards','');part(el,'.sres','');continue}
     const mine=s.uid===uid,isB=t.banker===s.uid&&t.phase!=='idle',r=t.phase==='done'?res[s.uid]:null;
     el.className='seat '+pos+(mine?' mine':'')+(s.online?'':' off');
-    let st='';if(t.phase==='idle')st=s.uid===t.owner||s.ready?'':'未準備';else if(t.phase==='tbet')st=isB?'':s.bet==null?'考慮中':'下注 '+fmt(s.bet);else if(r&&!isB)st='下注 '+fmt(r.bet);
+    let st='';if(t.phase==='idle')st=s.uid===t.owner||s.ready?'':'未準備';else if(t.phase==='tbet')st=isB?'':s.bet==null?'考慮中':'下注 '+fmt(s.bet);else if(t.phase==='peek')st=(isB?'':'下注 '+fmt(s.bet)+' · ')+(s.open?'已看牌':'看牌中');else if(r&&!isB)st='下注 '+fmt(r.bet);
     const tags=(s.uid===t.owner?'<span class="tag own">房主</span>':'')+(t.phase==='idle'&&s.ready&&s.uid!==t.owner?'<span class="tag rd">已準備</span>':'')+(st?`<span class="tag st">${esc(st)}</span>`:'')+(s.online?'':'<span class="tag">離線</span>')+(s.leave?'<span class="tag">離座中</span>':'');
     part(el,'.sinfo-w',`<div class="sinfo">${avatar(s.name,isB)}<div class="who"><span class="nm">${esc(mine?s.name+'（你）':s.name)}</span><span class="cb">${fmt(s.bal)}</span></div></div><div class="tags" style="margin-top:4px">${tags}</div>`);
-    if(r){const di=dealIdx[s.uid]||0,an=!RM.matches;
-      const ch=r.tiles.map((v,k)=>tile(v,' up'+(an?' deal flip':''),1300+(k*n+di)*140,2700+i*260+k*90)).join('');
+    const di=dealIdx[s.uid]||0,an=!RM.matches;
+    if(t.phase==='peek'){
+      const myT=mine&&thand&&thand.tid===t.id&&thand.round===t.round?thand.tiles:null;
+      const ch=myT?myT.map((v,k)=>mjTile(v,k,opened.ks.has(k),firstPeek&&an,1300+(k*n+di)*140)).join(''):[0,1].map(k=>tile(null,firstPeek&&an?' deal':'',1300+(k*n+di)*140)).join('');
+      part(el,'.scards',ch,'p'+t.round+':'+s.uid+(myT?'m':''));part(el,'.sres','')}
+    else if(r){const mineOpen=mine&&opened.round===t.round&&opened.ks.size===2;
+      const ch=r.tiles.map((v,k)=>tile(v,' up'+(an&&!mineOpen?' flip':''),0,200+i*240+k*90)).join('');
       part(el,'.scards',ch,'t'+t.round+':'+s.uid);
       const cls=r.hand==='白板對'?'n4':r.pair?'n3':r.hand.startsWith('九點')?'n2':r.bie?'n0':'n1';
-      part(el,'.sres',`<span class="hb ${cls}" style="--d:${3.4+i*.26}s">${esc(r.hand)}${r.mult>1?' ×'+r.mult:''}</span><span class="dl ${r.delta>0?'p':r.delta<0?'n':''}" style="--d2:5.4s">${r.delta>0?'+':''}${fmt(r.delta)}</span>`)}
+      part(el,'.sres',`<span class="hb ${cls}" style="--d:${1.1+i*.22}s">${esc(r.hand)}${r.mult>1?' ×'+r.mult:''}</span><span class="dl ${r.delta>0?'p':r.delta<0?'n':''}" style="--d2:3.4s">${r.delta>0?'+':''}${fmt(r.delta)}</span>`)}
     else{part(el,'.scards','');part(el,'.sres','')}
   }
-  if(first){fxRound=t.round;setVec();runFxTT(t,order)}
+  if(firstPeek){dealRound=t.round;setVec()}
+  if(first){fxRound=t.round;runFxTT(t,order)}
   // actions
   const my=t.seats.find(s=>s.uid===uid),bal=me?me.bal:0;let a='';
   const pen=inSeries&&!(t.phase==='done'&&t.seriesNo>=t.seriesTotal);
@@ -559,6 +589,7 @@ function renderTT(){
   else if(t.phase==='tbet'&&t.banker!==uid&&my.bet==null){const hi=Math.max(Math.min(t.maxBet,bal),Math.min(t.base,bal)),lo=Math.min(t.base,bal),v=Math.min(hi,Math.max(lo,t.base*2));
     a=`<div class="betbox"><span class="lab">下注</span><button class="btn sm" data-bq="${lo}">最低</button><input type="range" id="betR" min="${lo}" max="${hi}" step="${t.base}" value="${v}" aria-label="下注金額"><button class="btn sm" data-bq="${hi}">最高</button><span class="betv" id="betV">${fmt(v)}</span><button class="btn pri" data-tbgo="1">確定下注</button></div>`}
   else if(t.phase==='tbet')a=`<span class="lab">${t.banker===uid?'你是莊家，等待閒家下注…':'已下注，等待其他玩家…'}</span>${standBtn('本把結束後離座',1)}`;
+  else if(t.phase==='peek'){const mo=my.open||opened.ks.size>=2;a=mo?`<span class="lab">已看牌，等待其他玩家掀牌…</span>${standBtn('本把結束後離座',1)}`:`<span class="lab">按住你的牌往上推，把牌掀開來看</span><button class="btn pri" data-openall="1">直接開牌</button>`}
   else if(t.phase==='done')a=inSeries&&t.seriesNo<t.seriesTotal?`<span class="lab">下一把（${t.seriesNo+1}/${t.seriesTotal}）即將開始，莊家換下一位</span>${standBtn('離座')}`:'<span class="lab">本輪結束，稍後回到準備階段</span>';
   if($('#acts')._h!==a){$('#acts').innerHTML=a;$('#acts')._h=a}
 }
@@ -566,11 +597,24 @@ function runFxTT(t,order){
   if(RM.matches)return;const idx={};order.forEach((s,i)=>{if(s)idx[s.uid]=i});
   const rb=t.results.find(r=>r.uid===t.banker);let msg=null;
   if(rb&&rb.bie)msg=['鱉十通賠','莊家 '+rb.name];else{const sp=t.results.filter(r=>r.pair).sort((a,b)=>b.mult-a.mult)[0];if(sp)msg=[sp.hand,sp.name]}
-  if(msg)setTimeout(()=>{if(!table||table.round!==t.round)return;const fx=document.createElement('div');fx.className='fx';fx.innerHTML=`<div class="burst"></div><div class="big">${esc(msg[0])}</div><div class="who2">${esc(msg[1])}</div>`;$('#tw').appendChild(fx);setTimeout(()=>fx.remove(),1900)},3900);
+  if(msg)setTimeout(()=>{if(!table||table.round!==t.round)return;const fx=document.createElement('div');fx.className='fx';fx.innerHTML=`<div class="burst"></div><div class="big">${esc(msg[0])}</div><div class="who2">${esc(msg[1])}</div>`;$('#tw').appendChild(fx);setTimeout(()=>fx.remove(),1900)},1700);
   setTimeout(()=>{if(!table||table.round!==t.round)return;const B=t.banker;if(idx[B]==null)return;const bc=seatCenter(seatEls[idx[B]]);let k=0;
     for(const r of t.results){if(r.uid===B||!r.delta||idx[r.uid]==null)continue;const pc=seatCenter(seatEls[idx[r.uid]]);const [from,to]=r.delta<0?[pc,bc]:[bc,pc];
-      const n=Math.max(2,Math.min(7,Math.ceil(Math.abs(r.delta)/(t.base*2))));for(let j=0;j<n;j++)fly(from,to,(k++)*45+j*70)}},4700);
+      const n=Math.max(2,Math.min(7,Math.ceil(Math.abs(r.delta)/(t.base*2))));for(let j=0;j<n;j++)fly(from,to,(k++)*45+j*70)}},2500);
 }
+
+// ---------- 掀牌互動 ----------
+function openTile(el){if(!el||el.classList.contains('opened'))return;const k=+el.dataset.k;el.classList.remove('drag');el.style.setProperty('--lift','1');el.classList.add('opened');
+  opened.ks.add(k);if(opened.ks.size>=2&&sock){sock.emit('open');setTimeout(()=>{$('#acts')._h=null;renderTable()},350)}}
+let drag=null;
+document.addEventListener('pointerdown',e=>{const el=e.target.closest('.mj');if(!el||el.classList.contains('opened'))return;e.preventDefault();
+  drag={el,y:e.clientY,h:el.getBoundingClientRect().height,moved:false,id:e.pointerId};el.classList.add('drag');try{el.setPointerCapture(e.pointerId)}catch(x){}});
+document.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;const dy=drag.y-e.clientY;if(Math.abs(dy)>4)drag.moved=true;
+  const lift=Math.max(0,Math.min(1,dy/(drag.h*1.15)));drag.el.style.setProperty('--lift',lift.toFixed(3))});
+function endDrag(e){if(!drag||(e&&e.pointerId!==drag.id))return;const el=drag.el,lift=parseFloat(el.style.getPropertyValue('--lift'))||0,moved=drag.moved;drag=null;el.classList.remove('drag');
+  if(!moved||lift>.5)openTile(el);else el.style.setProperty('--lift','0')}
+document.addEventListener('pointerup',endDrag);document.addEventListener('pointercancel',endDrag);
+document.addEventListener('keydown',e=>{const el=e.target.closest&&e.target.closest('.mj');if(el&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openTile(el)}});
 
 // ---------- effects ----------
 function seatCenter(el){const tw=$('#tw').getBoundingClientRect(),r=(el.querySelector('.av')||el).getBoundingClientRect();return [r.left+r.width/2-tw.left,r.top+r.height/2-tw.top]}
@@ -593,7 +637,7 @@ function fly([x1,y1],[x2,y2],delay){const c=document.createElementNS('http://www
 
 // ---------- timer ring ----------
 function tickTimer(){const t=table,ring=$('#ring');if(!t||view!=='table'||!t.deadline||t.phase==='idle'){ring.hidden=true;return}
-  ring.hidden=false;const left=Math.max(0,(t.deadline-(Date.now()-skew))/1000),tot=t.phase==='grab'?t.grabSec:t.phase==='bet'?10:9;
+  ring.hidden=false;const left=Math.max(0,(t.deadline-(Date.now()-skew))/1000),tot=t.phase==='grab'||t.phase==='tbet'?t.grabSec:t.phase==='bet'?10:t.phase==='peek'?12.6:9;
   $('#timer').textContent=Math.ceil(left);const arc=$('#ringArc');arc.style.strokeDashoffset=String(163.4*(1-Math.min(1,left/tot)));arc.style.stroke=left<=3?'#ff6b6b':'#e7c46a'}
 setInterval(tickTimer,200);
 addEventListener('resize',()=>{if(table&&table.phase==='grab')setVec()});
@@ -616,6 +660,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||
   if(b.id==='back'){sock.emit('exit');table=null;show('lobby');return}
   if(d.a){if(d.confirm&&!d.sure){d.sure='1';b.textContent=`確定離座？共需付 ${fmt(table.base*5*Math.max(0,table.seats.filter(s=>s.uid!==me.id&&!s.leave).length))} 籌碼`;setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;$('#acts')._h=null;renderTable()}},3500);return}
     sock.emit(d.a,{v:d.x!=null?+d.x:undefined});return}
+  if(d.openall){document.querySelectorAll('.mj:not(.opened)').forEach((el,i)=>setTimeout(()=>openTile(el),i*250));return}
   if(d.bq){const r=$('#betR');if(r){r.value=d.bq;$('#betV').textContent=fmt(r.value)}return}
   if(d.tbgo){const r=$('#betR');if(r){sock.emit('tbet',{v:+r.value});b.disabled=true}return}
   if(d.ap){sock.emit('approve',{rid:d.ap});return}

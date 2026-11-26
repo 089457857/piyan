@@ -131,13 +131,13 @@ const online = uid => (io.sockets.adapter.rooms.get('u:' + uid)?.size || 0) > 0;
 const ownerOf = g => (g.seats.find(s => online(s.uid)) || g.seats[0] || {}).uid || null;
 // 遊戲種類：niuniu 牛牛 / tuitong 推筒子
 const gameOf = tid => S.tables[tid]?.game === 'tuitong' ? 'tuitong' : 'niuniu';
-const SERIES_OPTS = { niuniu: [3, 5, 10], tuitong: [4, 8, 12] }; // 房主可選的每輪局數
+const SERIES_OPTS = { niuniu: [3, 5, 10], tuitong: [4, 8] }; // 房主可選的每輪局數
 const seriesOptsOf = tid => SERIES_OPTS[gameOf(tid)];
 const seriesOf = tid => { const o = seriesOptsOf(tid), v = Number(S.tables[tid]?.series); return o.includes(v) ? v : (gameOf(tid) === 'tuitong' ? 4 : 5); };
 const maxSeatsOf = tid => gameOf(tid) === 'tuitong' ? 4 : 6;
-const MAXX_OPTS = [5, 10, 20]; // 推筒子下注上限 = 最低下注 × 倍數
-const maxXOf = tid => MAXX_OPTS.includes(Number(S.tables[tid]?.maxX)) ? Number(S.tables[tid].maxX) : 10;
-const isPlaying = g => ['grab', 'bet', 'tbet'].includes(g.phase);
+const maxXOf = () => 10; // 推筒子下注範圍：底注 ～ 底注 × 10（例：底注 10 → 10～100）
+const isPlaying = g => ['grab', 'bet', 'tbet', 'peek'].includes(g.phase);
+const PEEK_MS = 10000, DEAL_MS = 2600; // 推筒子：發牌動畫時間 + 掀牌時間
 const grabSecOf = tid => { const v = Number(S.tables[tid]?.grabSec); return v >= 5 && v <= 10 ? v : 8; };
 function pubTable(tid) {
   const t = S.tables[tid], g = rt(tid);
@@ -146,7 +146,7 @@ function pubTable(tid) {
     game: gameOf(tid), maxSeats: maxSeatsOf(tid), seriesOpts: seriesOptsOf(tid), maxX: maxXOf(tid), maxBet: t.base * maxXOf(tid),
     wall: g.wall ? g.wall.length : null, shoeHand: g.shoeHand || 0, dice: g.dice || null, startUid: g.startUid || null,
     deadline: g.deadline, now: Date.now(), results: g.results, owner: ownerOf(g), seriesNo: g.seriesNo || 0, seriesTotal: g.seriesNo ? (g.seriesLen || seriesOf(tid)) : seriesOf(tid), grabSec: grabSecOf(tid),
-    seats: g.seats.map(s => ({ uid: s.uid, name: S.users[s.uid]?.name || '玩家', bal: S.users[s.uid]?.bal || 0, grab: s.grab, bet: s.bet, ready: !!s.ready, leave: !!s.leave, online: online(s.uid) })),
+    seats: g.seats.map(s => ({ uid: s.uid, name: S.users[s.uid]?.name || '玩家', bal: S.users[s.uid]?.bal || 0, grab: s.grab, bet: s.bet, ready: !!s.ready, leave: !!s.leave, open: !!s.open, online: online(s.uid) })),
   };
 }
 const pushTable = tid => S.tables[tid] && io.to('t:' + tid).emit('table', pubTable(tid));
@@ -277,15 +277,23 @@ function ttStart(tid) {
   g.phase = 'tbet'; g.deadline = Date.now() + grabSecOf(tid) * 1000;
   pushTable(tid); pushLobby();
 }
-function ttShowdown(tid) {
+function ttDeal(tid) {
   const t = S.tables[tid], g = rt(tid), B = g.banker, n = g.seats.length;
   const bal = uid => S.users[uid]?.bal || 0;
-  g.seats.forEach(s => { if (s.uid !== B && s.bet == null) s.bet = Math.min(t.base, bal(s.uid)); });
+  g.seats.forEach(s => { if (s.uid !== B && s.bet == null) s.bet = Math.min(t.base, bal(s.uid)); s.open = false; });
   // 擲骰決定從哪一家開始發牌（從莊家起算）
   const d1 = rnd(6) + 1, d2 = rnd(6) + 1; g.dice = [d1, d2];
   const bi = g.seats.findIndex(s => s.uid === B), start = (bi + (d1 + d2 - 1)) % n;
   g.startUid = g.seats[start].uid;
   for (let k = 0; k < n; k++) { const s = g.seats[(start + k) % n]; g.hands[s.uid] = [g.wall.shift(), g.wall.shift()]; }
+  // 看牌階段：每人只收到自己的牌，掀完或時間到才一起亮牌
+  g.phase = 'peek'; g.deadline = Date.now() + DEAL_MS + PEEK_MS;
+  for (const s of g.seats) io.to('u:' + s.uid).emit('thand', { tid, round: g.round, tiles: g.hands[s.uid] });
+  pushTable(tid);
+}
+function ttSettle(tid) {
+  const t = S.tables[tid], g = rt(tid), B = g.banker;
+  const bal = uid => S.users[uid]?.bal || 0;
   const ev = {}; g.seats.forEach(s => ev[s.uid] = ttEval(g.hands[s.uid]));
   const delta = {}, owed = []; let inB = 0;
   for (const s of g.seats) {
@@ -301,7 +309,7 @@ function ttShowdown(tid) {
   g.results = g.seats.map(s => ({ uid: s.uid, name: S.users[s.uid]?.name || '玩家', tiles: g.hands[s.uid], hand: ev[s.uid].name, mult: ev[s.uid].mult, pair: ev[s.uid].pair, bie: ev[s.uid].bie, delta: delta[s.uid] || 0, bet: s.bet }));
   S.history.unshift({ round: g.round, table: t.name, at: Date.now(), bankerName: S.users[B]?.name || '', res: g.results.map(r => ({ uid: r.uid, hand: r.hand, delta: r.delta })) });
   S.history = S.history.slice(0, 300);
-  g.phase = 'done'; g.deadline = Date.now() + 12000;
+  g.phase = 'done'; g.deadline = Date.now() + 9000;
   save(); pushTable(tid); for (const s of g.seats) pushMe(s.uid); pushAdmin();
 }
 
@@ -311,7 +319,8 @@ setInterval(() => {
     const g = G[tid]; if (!S.tables[tid]) { delete G[tid]; continue; }
     if (g.phase === 'grab' && (g.seats.every(s => s.grab != null) || now > g.deadline)) resolveBanker(tid);
     else if (g.phase === 'bet' && (g.seats.every(s => s.uid === g.banker || s.bet != null) || now > g.deadline)) showdown(tid);
-    else if (g.phase === 'tbet' && (g.seats.every(s => s.uid === g.banker || s.bet != null) || now > g.deadline)) ttShowdown(tid);
+    else if (g.phase === 'tbet' && (g.seats.every(s => s.uid === g.banker || s.bet != null) || now > g.deadline)) ttDeal(tid);
+    else if (g.phase === 'peek' && (g.seats.every(s => s.open) || now > g.deadline)) ttSettle(tid);
     else if (g.phase === 'done' && now > g.deadline) {
       if ((g.seriesNo || 0) < (g.seriesLen || seriesOf(tid))) {
         const gone = g.seats.filter(s => !s.leave && !online(s.uid));
@@ -352,6 +361,7 @@ io.on('connection', socket => {
     cur = tid; socket.join('t:' + tid); socket.emit('table', pubTable(tid));
     const g = rt(tid);
     if ((g.phase === 'grab' || g.phase === 'bet') && g.hands[uid]) socket.emit('hand', { tid, round: g.round, cards: g.hands[uid].slice(0, 4) });
+    if (g.phase === 'peek' && g.hands[uid]) socket.emit('thand', { tid, round: g.round, tiles: g.hands[uid] });
     pushTable(tid);
   });
   socket.on('exit', () => { if (cur) { socket.leave('t:' + cur); cur = null; } });
@@ -398,12 +408,10 @@ io.on('connection', socket => {
     if (g.seriesNo) return toast('這一輪進行中，打完再調整');
     S.tables[cur].series = n; save(); pushTable(cur); toast('每輪局數已改為 ' + n + (gameOf(cur) === 'tuitong' ? ' 把' : ' 局'));
   });
-  socket.on('setMaxX', ({ x } = {}) => {
-    if (!cur) return; const g = rt(cur); x = Math.round(Number(x));
-    if (ownerOf(g) !== uid) return toast('只有房主可以調整設定');
-    if (!MAXX_OPTS.includes(x) || gameOf(cur) !== 'tuitong') return;
-    if (isPlaying(g)) return toast('牌局進行中，結束後再調整');
-    S.tables[cur].maxX = x; save(); pushTable(cur); toast('下注上限已改為 ' + (S.tables[cur].base * x).toLocaleString());
+  socket.on('open', () => {
+    if (!cur) return; const g = rt(cur), s = g.seats.find(x => x.uid === uid);
+    if (g.phase !== 'peek' || !s || s.open) return;
+    s.open = true; pushTable(cur);
   });
   socket.on('tbet', ({ v } = {}) => {
     if (!cur) return; const g = rt(cur), t = S.tables[cur], s = g.seats.find(x => x.uid === uid);

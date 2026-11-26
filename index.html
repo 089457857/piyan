@@ -126,12 +126,14 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:now
         <div class="setp" id="setPanel" hidden>
           <label for="grabSel">搶莊考慮時間</label>
           <select id="grabSel" aria-label="搶莊考慮時間"></select>
+          <label for="serSel">每輪局數</label>
+          <select id="serSel" aria-label="每輪局數"><option value="3">3 局</option><option value="5">5 局</option><option value="10">10 局</option></select>
           <span class="sub" id="setHint"></span>
         </div>
         <div class="seats" id="seats"></div>
         <div class="acts" id="acts"></div>
       </div>
-      <p class="note">牌型：五小牛 ×5 ＞ 炸彈 ×4 ＞ 五花牛 ×4 ＞ 牛牛 ×3 ＞ 牛九～牛七 ×2 ＞ 牛六～牛一、沒牛 ×1。同牌型比最大張，再比花色 ♠＞♥＞♣＞♦。輸贏 = 底注 × 搶莊倍數 × 下注倍數 × 贏家牌型倍數。最先入座的玩家是房主，其他玩家按「準備」後由房主開始遊戲。</p>
+      <p class="note">牌型：五小牛 ×5 ＞ 炸彈 ×4 ＞ 五花牛 ×4 ＞ 牛牛 ×3 ＞ 牛九～牛七 ×2 ＞ 牛六～牛一、沒牛 ×1。同牌型比最大張，再比花色 ♠＞♥＞♣＞♦。輸贏 = 底注 × 搶莊倍數 × 下注倍數 × 贏家牌型倍數。最先入座的玩家是房主，其他玩家按「準備」後由房主開始遊戲，每輪連續進行 3、5 或 10 局（房主在「設定」選擇），打完再重新準備。</p>
     </section>
 
     <section id="v-chips" hidden>
@@ -213,11 +215,13 @@ function renderLobby(){$('#tables').innerHTML=lobby.length?lobby.map(t=>`<div cl
 function cardHTML(c,f){if(!c)return '<div class="card back"></div>';return `<div class="card${c.s===0||c.s===2?' red':''}${f?' flip':''}"><span class="r">${RK[c.r]}</span><span class="s">${SU[c.s]}</span></div>`}
 function renderTable(){
   if(!table||view!=='table')return;const t=table,uid=me&&me.id;
-  $('#phase').textContent=PH[t.phase]||'';
+  const inSeries=t.seriesNo>0;
+  $('#phase').textContent=t.phase==='done'?(t.seriesNo<t.seriesTotal?'本局結算 · 下一局即將開始':'本輪結束'):(PH[t.phase]||'');
   const isOwner=t.owner===uid,own=t.seats.find(s=>s.uid===t.owner);
-  let sub=`${t.name} · 底注 ${fmt(t.base)} · 搶莊 ${t.grabSec} 秒 · 第 ${t.round} 局${own?' · 房主：'+own.name:''}`;
+  let sub=`${t.name} · 底注 ${fmt(t.base)} · 搶莊 ${t.grabSec} 秒 · ${inSeries?`本輪第 ${t.seriesNo}/${t.seriesTotal} 局`:`每輪 ${t.seriesTotal} 局`}${own?' · 房主：'+own.name:''}`;
   $('#grabSel').value=String(t.grabSec);$('#grabSel').disabled=!isOwner||!(t.phase==='idle'||t.phase==='done');
-  $('#setHint').textContent=isOwner?'只有房主可以調整，牌局進行中無法修改':'目前由房主設定，你只能查看';const bk=t.seats.find(s=>s.uid===t.banker);if(bk)sub+=` · 莊家：${bk.name}${t.grabMult>1?'（搶 '+t.grabMult+' 倍）':''}`;$('#phaseSub').textContent=sub;
+  $('#serSel').value=String(t.seriesTotal);$('#serSel').disabled=!isOwner||inSeries;
+  $('#setHint').textContent=isOwner?'只有房主可以調整；局數要在這一輪打完後才能改':'目前由房主設定，你只能查看';const bk=t.seats.find(s=>s.uid===t.banker);if(bk)sub+=` · 莊家：${bk.name}${t.grabMult>1?'（搶 '+t.grabMult+' 倍）':''}`;$('#phaseSub').textContent=sub;
   const seats=[...t.seats].sort((a,b)=>(b.uid===uid)-(a.uid===uid)),res={};(t.results||[]).forEach(r=>res[r.uid]=r);
   let h=seats.map(s=>{const r=t.phase==='done'?res[s.uid]:null,mine=s.uid===uid,isB=t.banker===s.uid;let cards='';
     if(r){const tri=r.tri||[],a=tri.map(i=>r.cards[i]),b=r.cards.filter((_,i)=>!tri.includes(i));cards=(tri.length?a.map(c=>cardHTML(c,1)).join('')+'<span class="gap"></span>':'')+b.map(c=>cardHTML(c,1)).join('')}
@@ -229,12 +233,12 @@ function renderTable(){
   for(let i=seats.length;i<6;i++)h+='<div class="seat empty">空位</div>';$('#seats').innerHTML=h;
   const my=t.seats.find(s=>s.uid===uid),open=t.phase==='idle'||t.phase==='done',bal=me?me.bal:0;let a='';
   const others=t.seats.filter(s=>s.uid!==t.owner),waiting=others.filter(s=>!s.ready).length,canStart=t.seats.length>=2&&waiting===0;
-  if(!my)a=t.phase==='idle'?`<button class="btn pri" data-a="sit" ${t.seats.length>=6||bal<t.base?'disabled':''}>入座</button><span class="lab">${bal<t.base?'籌碼不足，請到「我的籌碼」申請':t.seats.length?'入座後按「準備」，等房主開始':'第一位入座的人會成為房主'}</span>`:t.phase==='done'?'<span class="lab">本局結算中，稍後即可入座</span>':'<span class="lab">本局進行中，下一局才能入座</span>';
-  else if(t.phase==='idle'&&isOwner)a=`<button class="btn pri" data-a="start" ${canStart?'':'disabled'}>開始遊戲</button><span class="lab">${t.seats.length<2?'至少需要 2 位玩家入座':waiting?'還有 '+waiting+' 位玩家尚未準備':'大家都準備好了'}</span><button class="btn" data-a="stand">離座</button>`;
-  else if(t.phase==='idle')a=`<button class="btn${my.ready?'':' pri'}" data-a="ready">${my.ready?'取消準備':'準備'}</button><span class="lab">${my.ready?'等待房主開始遊戲':'按下準備，房主才能開局'}</span><button class="btn" data-a="stand">離座</button>`;
+  if(!my)a=t.phase!=='idle'?`<span class="lab">這一輪 ${t.seriesTotal} 局進行中（第 ${t.seriesNo} 局），結束後才能入座</span>`:t.phase==='idle'?`<button class="btn pri" data-a="sit" ${t.seats.length>=6||bal<t.base?'disabled':''}>入座</button><span class="lab">${bal<t.base?'籌碼不足，請到「我的籌碼」申請':t.seats.length?'入座後按「準備」，等房主開始':'第一位入座的人會成為房主'}</span>`:t.phase==='done'?'<span class="lab">本局結算中，稍後即可入座</span>':'<span class="lab">本局進行中，下一局才能入座</span>';
+  else if(t.phase==='idle'&&isOwner)a=`<button class="btn pri" data-a="start" ${canStart?'':'disabled'}>開始遊戲（${t.seriesTotal} 局）</button><span class="lab">${t.seats.length<2?'至少需要 2 位玩家入座':waiting?'還有 '+waiting+' 位玩家尚未準備':'大家都準備好了'}</span><button class="btn" data-a="stand">離座</button>`;
+  else if(t.phase==='idle')a=`<button class="btn${my.ready?'':' pri'}" data-a="ready">${my.ready?'取消準備':'準備'}</button><span class="lab">${my.ready?'等待房主開始遊戲':`按下準備，房主開始後會連續進行 ${t.seriesTotal} 局`}</span><button class="btn" data-a="stand">離座</button>`;
   else if(t.phase==='grab'&&my.grab==null)a='<span class="lab">看完 4 張牌，要搶莊嗎？</span>'+[0,1,2,3,4].map(v=>`<button class="btn${v?' pri':''}" data-a="grab" data-x="${v}">${v?'搶 '+v+' 倍':'不搶'}</button>`).join('');
   else if(t.phase==='bet'&&t.banker!==uid&&my.bet==null)a='<span class="lab">選擇下注倍數</span>'+[1,2,3,5].map(v=>`<button class="btn pri" data-a="bet" data-x="${v}">${v} 倍</button>`).join('');
-  else if(t.phase==='done')a='<span class="lab">本局結算中，稍後回到準備階段</span>';
+  else if(t.phase==='done')a=t.seriesNo<t.seriesTotal?`<span class="lab">下一局（${t.seriesNo+1}/${t.seriesTotal}）即將自動開始</span>${my.leave?'':'<button class="btn" data-a="stand">離座</button>'}`:'<span class="lab">本輪結束，稍後回到準備階段</span>';
   else a=`<span class="lab">等待其他玩家…</span>${my.leave?'':'<button class="btn sm" data-a="stand">本局結束後離座</button>'}`;
   $('#acts').innerHTML=a}
 function tickTimer(){const t=table;if(!t||view!=='table'||!t.deadline){$('#timer').textContent='';return}$('#timer').textContent=Math.max(0,Math.ceil((t.deadline-(Date.now()-skew))/1000))+'s'}
@@ -263,7 +267,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||
   if(d.pw){const cell=b.parentElement;cell.innerHTML=`<input type="text" placeholder="新密碼" style="width:8em" aria-label="新密碼"><button class="btn sm pri" data-pwgo="${esc(d.pw)}">確定</button>`;return}
   if(d.pwgo){const i=b.previousElementSibling;sock.emit('resetPass',{target:d.pwgo,pass:i.value});return}
 });
-document.addEventListener('change',e=>{if(e.target.id==='grabSel'&&sock){sock.emit('setGrab',{sec:+e.target.value});return}if(e.target.dataset.base&&sock)sock.emit('editTable',{tid:e.target.dataset.base,base:+e.target.value})});
+document.addEventListener('change',e=>{if(e.target.id==='grabSel'&&sock){sock.emit('setGrab',{sec:+e.target.value});return}if(e.target.id==='serSel'&&sock){sock.emit('setSeries',{n:+e.target.value});return}if(e.target.dataset.base&&sock)sock.emit('editTable',{tid:e.target.dataset.base,base:+e.target.value})});
 $('#reqForm').onsubmit=e=>{e.preventDefault();sock&&sock.emit('request',{amount:+$('#reqAmt').value,note:$('#reqNote').value});$('#reqNote').value=''};
 $('#newTable').onsubmit=e=>{e.preventDefault();sock&&sock.emit('createTable',{name:$('#ntName').value,base:+$('#ntBase').value});$('#ntName').value=''};
 }

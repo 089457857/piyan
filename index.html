@@ -42,6 +42,9 @@ input,select{font:16px "Noto Sans TC",sans-serif;background:#0a1f19;color:var(--
 .nm{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tag{font-size:12px;padding:1px 8px;border-radius:99px;background:#ffffff1a;white-space:nowrap}
 .tag.bk{background:var(--gold);color:#2a1d00;font-weight:700}
+.tag.own{background:#ffffff;color:#0d4a3a;font-weight:700}
+.tag.rd{background:#4fd18b33;color:var(--ok);font-weight:700}
+.setp{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:#00000040;border:1px solid #ffffff22;border-radius:14px;padding:10px 14px;margin:-4px 0 16px}
 .sb{font-size:13px;color:var(--dim);display:flex;gap:10px;flex-wrap:wrap}
 .sb b{color:var(--gold);font-variant-numeric:tabular-nums}
 .hand{display:flex;gap:4px}
@@ -118,12 +121,17 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:now
       <div class="felt">
         <div class="center">
           <div><div class="phase" id="phase"></div><div class="sub" id="phaseSub"></div></div>
-          <div class="row"><div class="timer" id="timer"></div><button class="btn sm" id="back">回大廳</button></div>
+          <div class="row"><div class="timer" id="timer"></div><button class="btn sm" id="setBtn" aria-expanded="false">設定</button><button class="btn sm" id="back">回大廳</button></div>
+        </div>
+        <div class="setp" id="setPanel" hidden>
+          <label for="grabSel">搶莊考慮時間</label>
+          <select id="grabSel" aria-label="搶莊考慮時間"></select>
+          <span class="sub" id="setHint"></span>
         </div>
         <div class="seats" id="seats"></div>
         <div class="acts" id="acts"></div>
       </div>
-      <p class="note">牌型：五小牛 ×5 ＞ 炸彈 ×4 ＞ 五花牛 ×4 ＞ 牛牛 ×3 ＞ 牛九～牛七 ×2 ＞ 牛六～牛一、沒牛 ×1。同牌型比最大張，再比花色 ♠＞♥＞♣＞♦。輸贏 = 底注 × 搶莊倍數 × 下注倍數 × 贏家牌型倍數。兩人以上入座就會自動開局。</p>
+      <p class="note">牌型：五小牛 ×5 ＞ 炸彈 ×4 ＞ 五花牛 ×4 ＞ 牛牛 ×3 ＞ 牛九～牛七 ×2 ＞ 牛六～牛一、沒牛 ×1。同牌型比最大張，再比花色 ♠＞♥＞♣＞♦。輸贏 = 底注 × 搶莊倍數 × 下注倍數 × 贏家牌型倍數。最先入座的玩家是房主，其他玩家按「準備」後由房主開始遊戲。</p>
     </section>
 
     <section id="v-chips" hidden>
@@ -163,12 +171,13 @@ const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>Number(n||0).toLocaleString();
 const SU=['♦','♣','♥','♠'],RK=['','A','2','3','4','5','6','7','8','9','10','J','Q','K'],BASES=[10,50,100,500,1000];
-const PH={idle:'等待開局',grab:'搶莊中',bet:'下注中',done:'本局結算'};
+const PH={idle:'等待準備',grab:'搶莊中',bet:'下注中',done:'本局結算'};
 let token=null;try{token=localStorage.getItem('nn-token')}catch(e){}
 let sock=null,me=null,lobby=[],table=null,hand=null,adm=null,view='lobby',skew=0,regMode=false,toastT=0;
 
 function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600)}
 function show(v){view=v;for(const k of ['lobby','table','chips','admin'])$('#v-'+k).hidden=k!==v;document.querySelectorAll('nav .btn').forEach(b=>b.classList.toggle('on',b.dataset.v===v||(v==='table'&&b.dataset.v==='lobby')))}
+$('#grabSel').innerHTML=[5,6,7,8,9,10].map(v=>`<option value="${v}">${v} 秒</option>`).join('');
 $('#ntBase').innerHTML=BASES.map(b=>`<option value="${b}">底注 ${b}</option>`).join('');
 
 // ---------- auth ----------
@@ -204,22 +213,28 @@ function renderLobby(){$('#tables').innerHTML=lobby.length?lobby.map(t=>`<div cl
 function cardHTML(c,f){if(!c)return '<div class="card back"></div>';return `<div class="card${c.s===0||c.s===2?' red':''}${f?' flip':''}"><span class="r">${RK[c.r]}</span><span class="s">${SU[c.s]}</span></div>`}
 function renderTable(){
   if(!table||view!=='table')return;const t=table,uid=me&&me.id;
-  $('#phase').textContent=t.phase==='idle'&&t.deadline?'即將開局':(PH[t.phase]||'');
-  let sub=`${t.name} · 底注 ${fmt(t.base)} · 第 ${t.round} 局`;const bk=t.seats.find(s=>s.uid===t.banker);if(bk)sub+=` · 莊家：${bk.name}${t.grabMult>1?'（搶 '+t.grabMult+' 倍）':''}`;$('#phaseSub').textContent=sub;
+  $('#phase').textContent=PH[t.phase]||'';
+  const isOwner=t.owner===uid,own=t.seats.find(s=>s.uid===t.owner);
+  let sub=`${t.name} · 底注 ${fmt(t.base)} · 搶莊 ${t.grabSec} 秒 · 第 ${t.round} 局${own?' · 房主：'+own.name:''}`;
+  $('#grabSel').value=String(t.grabSec);$('#grabSel').disabled=!isOwner||!(t.phase==='idle'||t.phase==='done');
+  $('#setHint').textContent=isOwner?'只有房主可以調整，牌局進行中無法修改':'目前由房主設定，你只能查看';const bk=t.seats.find(s=>s.uid===t.banker);if(bk)sub+=` · 莊家：${bk.name}${t.grabMult>1?'（搶 '+t.grabMult+' 倍）':''}`;$('#phaseSub').textContent=sub;
   const seats=[...t.seats].sort((a,b)=>(b.uid===uid)-(a.uid===uid)),res={};(t.results||[]).forEach(r=>res[r.uid]=r);
   let h=seats.map(s=>{const r=t.phase==='done'?res[s.uid]:null,mine=s.uid===uid,isB=t.banker===s.uid;let cards='';
     if(r){const tri=r.tri||[],a=tri.map(i=>r.cards[i]),b=r.cards.filter((_,i)=>!tri.includes(i));cards=(tri.length?a.map(c=>cardHTML(c,1)).join('')+'<span class="gap"></span>':'')+b.map(c=>cardHTML(c,1)).join('')}
     else if(t.phase==='grab'||t.phase==='bet'){const mc=mine&&hand&&hand.tid===t.id&&hand.round===t.round?hand.cards:[];cards=[0,1,2,3,4].map(i=>cardHTML(mc[i])).join('')}
-    let st='';if(t.phase==='grab')st=s.grab==null?'考慮中…':s.grab?'搶 '+s.grab+' 倍':'不搶';else if(t.phase==='bet')st=isB?'莊家':s.bet==null?'下注中…':'押 '+s.bet+' 倍';else if(r&&!isB)st='押 '+r.bet+' 倍';
-    return `<div class="seat${mine?' mine':''}${s.online?'':' off'}"><div class="top"><span class="nm">${esc(mine?s.name+'（你）':s.name)}</span><span class="row">${isB?'<span class="tag bk">莊</span>':''}${s.online?'':'<span class="tag">離線</span>'}${s.leave?'<span class="tag">離座中</span>':''}</span></div>
+    let st='';if(t.phase==='idle')st=s.uid===t.owner||s.ready?'':'未準備';else if(t.phase==='grab')st=s.grab==null?'考慮中…':s.grab?'搶 '+s.grab+' 倍':'不搶';else if(t.phase==='bet')st=isB?'莊家':s.bet==null?'下注中…':'押 '+s.bet+' 倍';else if(r&&!isB)st='押 '+r.bet+' 倍';
+    return `<div class="seat${mine?' mine':''}${s.online?'':' off'}"><div class="top"><span class="nm">${esc(mine?s.name+'（你）':s.name)}</span><span class="row">${s.uid===t.owner?'<span class="tag own">房主</span>':''}${t.phase==='idle'&&s.ready&&s.uid!==t.owner?'<span class="tag rd">已準備</span>':''}${isB?'<span class="tag bk">莊</span>':''}${s.online?'':'<span class="tag">離線</span>'}${s.leave?'<span class="tag">離座中</span>':''}</span></div>
       <div class="sb"><span>籌碼 <b>${fmt(s.bal)}</b></span><span>${esc(st)}</span></div><div class="hand">${cards}</div>
       ${r?`<div class="res"><span class="hn">${esc(r.hand)}${r.mult>1?' ×'+r.mult:''}</span><span class="dl ${r.delta>0?'p':r.delta<0?'n':''}">${r.delta>0?'+':''}${fmt(r.delta)}</span></div>`:''}</div>`}).join('');
   for(let i=seats.length;i<6;i++)h+='<div class="seat empty">空位</div>';$('#seats').innerHTML=h;
   const my=t.seats.find(s=>s.uid===uid),open=t.phase==='idle'||t.phase==='done',bal=me?me.bal:0;let a='';
-  if(!my)a=open?`<button class="btn pri" data-a="sit" ${t.seats.length>=6||bal<t.base?'disabled':''}>入座</button><span class="lab">${bal<t.base?'籌碼不足，請到「我的籌碼」申請':'兩人以上入座就會自動開局'}</span>`:'<span class="lab">本局進行中，下一局才能入座</span>';
+  const others=t.seats.filter(s=>s.uid!==t.owner),waiting=others.filter(s=>!s.ready).length,canStart=t.seats.length>=2&&waiting===0;
+  if(!my)a=t.phase==='idle'?`<button class="btn pri" data-a="sit" ${t.seats.length>=6||bal<t.base?'disabled':''}>入座</button><span class="lab">${bal<t.base?'籌碼不足，請到「我的籌碼」申請':t.seats.length?'入座後按「準備」，等房主開始':'第一位入座的人會成為房主'}</span>`:t.phase==='done'?'<span class="lab">本局結算中，稍後即可入座</span>':'<span class="lab">本局進行中，下一局才能入座</span>';
+  else if(t.phase==='idle'&&isOwner)a=`<button class="btn pri" data-a="start" ${canStart?'':'disabled'}>開始遊戲</button><span class="lab">${t.seats.length<2?'至少需要 2 位玩家入座':waiting?'還有 '+waiting+' 位玩家尚未準備':'大家都準備好了'}</span><button class="btn" data-a="stand">離座</button>`;
+  else if(t.phase==='idle')a=`<button class="btn${my.ready?'':' pri'}" data-a="ready">${my.ready?'取消準備':'準備'}</button><span class="lab">${my.ready?'等待房主開始遊戲':'按下準備，房主才能開局'}</span><button class="btn" data-a="stand">離座</button>`;
   else if(t.phase==='grab'&&my.grab==null)a='<span class="lab">看完 4 張牌，要搶莊嗎？</span>'+[0,1,2,3,4].map(v=>`<button class="btn${v?' pri':''}" data-a="grab" data-x="${v}">${v?'搶 '+v+' 倍':'不搶'}</button>`).join('');
   else if(t.phase==='bet'&&t.banker!==uid&&my.bet==null)a='<span class="lab">選擇下注倍數</span>'+[1,2,3,5].map(v=>`<button class="btn pri" data-a="bet" data-x="${v}">${v} 倍</button>`).join('');
-  else if(open)a='<button class="btn" data-a="stand">離座</button><span class="lab">等待其他玩家</span>';
+  else if(t.phase==='done')a='<span class="lab">本局結算中，稍後回到準備階段</span>';
   else a=`<span class="lab">等待其他玩家…</span>${my.leave?'':'<button class="btn sm" data-a="stand">本局結束後離座</button>'}`;
   $('#acts').innerHTML=a}
 function tickTimer(){const t=table;if(!t||view!=='table'||!t.deadline){$('#timer').textContent='';return}$('#timer').textContent=Math.max(0,Math.ceil((t.deadline-(Date.now()-skew))/1000))+'s'}
@@ -237,6 +252,7 @@ function renderAdmin(){if(!adm||!me||!me.admin)return;
 document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!sock)return;const d=b.dataset;
   if(d.v){if(d.v!=='table'&&table){sock.emit('exit');table=null}show(d.v);renderChips();renderAdmin();return}
   if(d.join){table={id:d.join};hand=null;show('table');sock.emit('join',{tid:d.join});return}
+  if(b.id==='setBtn'){const p=$('#setPanel');p.hidden=!p.hidden;b.setAttribute('aria-expanded',String(!p.hidden));return}
   if(b.id==='back'){sock.emit('exit');table=null;show('lobby');return}
   if(d.a){sock.emit(d.a,{v:d.x!=null?+d.x:undefined});return}
   if(d.ap){sock.emit('approve',{rid:d.ap});return}
@@ -247,7 +263,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||
   if(d.pw){const cell=b.parentElement;cell.innerHTML=`<input type="text" placeholder="新密碼" style="width:8em" aria-label="新密碼"><button class="btn sm pri" data-pwgo="${esc(d.pw)}">確定</button>`;return}
   if(d.pwgo){const i=b.previousElementSibling;sock.emit('resetPass',{target:d.pwgo,pass:i.value});return}
 });
-document.addEventListener('change',e=>{if(e.target.dataset.base&&sock)sock.emit('editTable',{tid:e.target.dataset.base,base:+e.target.value})});
+document.addEventListener('change',e=>{if(e.target.id==='grabSel'&&sock){sock.emit('setGrab',{sec:+e.target.value});return}if(e.target.dataset.base&&sock)sock.emit('editTable',{tid:e.target.dataset.base,base:+e.target.value})});
 $('#reqForm').onsubmit=e=>{e.preventDefault();sock&&sock.emit('request',{amount:+$('#reqAmt').value,note:$('#reqNote').value});$('#reqNote').value=''};
 $('#newTable').onsubmit=e=>{e.preventDefault();sock&&sock.emit('createTable',{name:$('#ntName').value,base:+$('#ntBase').value});$('#ntName').value=''};
 }

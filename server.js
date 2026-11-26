@@ -126,12 +126,14 @@ function rt(tid) {
   return G[tid];
 }
 const online = uid => (io.sockets.adapter.rooms.get('u:' + uid)?.size || 0) > 0;
+const ownerOf = g => (g.seats.find(s => online(s.uid)) || g.seats[0] || {}).uid || null;
+const grabSecOf = tid => { const v = Number(S.tables[tid]?.grabSec); return v >= 5 && v <= 10 ? v : 8; };
 function pubTable(tid) {
   const t = S.tables[tid], g = rt(tid);
   return {
     id: tid, name: t.name, base: t.base, phase: g.phase, round: g.round, banker: g.banker, grabMult: g.grabMult,
-    deadline: g.deadline, now: Date.now(), results: g.results,
-    seats: g.seats.map(s => ({ uid: s.uid, name: S.users[s.uid]?.name || '玩家', bal: S.users[s.uid]?.bal || 0, grab: s.grab, bet: s.bet, leave: !!s.leave, online: online(s.uid) })),
+    deadline: g.deadline, now: Date.now(), results: g.results, owner: ownerOf(g), grabSec: grabSecOf(tid),
+    seats: g.seats.map(s => ({ uid: s.uid, name: S.users[s.uid]?.name || '玩家', bal: S.users[s.uid]?.bal || 0, grab: s.grab, bet: s.bet, ready: !!s.ready, leave: !!s.leave, online: online(s.uid) })),
   };
 }
 const pushTable = tid => S.tables[tid] && io.to('t:' + tid).emit('table', pubTable(tid));
@@ -173,7 +175,7 @@ function startRound(tid) {
   for (let i = deck.length - 1; i > 0; i--) { const j = rnd(i + 1); [deck[i], deck[j]] = [deck[j], deck[i]]; }
   g.round++; g.hands = {}; g.results = null; g.banker = null; g.grabMult = 1;
   g.seats.forEach(s => { g.hands[s.uid] = deck.splice(0, 5); s.grab = null; s.bet = null; });
-  g.phase = 'grab'; g.deadline = Date.now() + 12000;
+  g.phase = 'grab'; g.deadline = Date.now() + grabSecOf(tid) * 1000;
   for (const s of g.seats) io.to('u:' + s.uid).emit('hand', { tid, round: g.round, cards: g.hands[s.uid].slice(0, 4) });
   pushTable(tid); pushLobby();
 }
@@ -182,7 +184,7 @@ function resolveBanker(tid) {
   g.seats.forEach(s => { if (s.grab == null) s.grab = 0; });
   const mx = Math.max(...g.seats.map(s => s.grab)), c = g.seats.filter(s => s.grab === mx);
   g.banker = c[rnd(c.length)].uid; g.grabMult = Math.max(1, mx);
-  g.phase = 'bet'; g.deadline = Date.now() + 12000; pushTable(tid);
+  g.phase = 'bet'; g.deadline = Date.now() + 10000; pushTable(tid);
 }
 function showdown(tid) {
   const t = S.tables[tid], g = rt(tid), B = g.banker;
@@ -211,13 +213,16 @@ setInterval(() => {
     if (g.phase === 'grab' && (g.seats.every(s => s.grab != null) || now > g.deadline)) resolveBanker(tid);
     else if (g.phase === 'bet' && (g.seats.every(s => s.uid === g.banker || s.bet != null) || now > g.deadline)) showdown(tid);
     else if (g.phase === 'done' && now > g.deadline) {
-      g.seats = g.seats.filter(s => !s.leave && online(s.uid)); g.phase = 'idle'; g.deadline = null; g.results = null; g.banker = null;
+      g.seats = g.seats.filter(s => !s.leave && online(s.uid)); g.seats.forEach(s => { s.ready = false; });
+      g.phase = 'idle'; g.deadline = null; g.results = null; g.banker = null;
       pushTable(tid); pushLobby();
     } else if (g.phase === 'idle') {
-      const ready = g.seats.filter(s => online(s.uid)).length >= 2;
-      if (ready && !g.deadline) { g.deadline = now + 5000; pushTable(tid); }
-      else if (!ready && g.deadline) { g.deadline = null; pushTable(tid); }
-      else if (ready && now > g.deadline) startRound(tid);
+      // 斷線超過 15 秒的玩家離座，房主自動由下一位遞補
+      let changed = false;
+      for (const s of g.seats) { if (online(s.uid)) { if (s.offSince) { delete s.offSince; changed = true; } } else if (!s.offSince) { s.offSince = now; changed = true; } }
+      const before = g.seats.length;
+      g.seats = g.seats.filter(s => !s.offSince || now - s.offSince < 15000);
+      if (changed || g.seats.length !== before) { pushTable(tid); if (g.seats.length !== before) pushLobby(); }
     }
   }
 }, 400);
@@ -252,12 +257,33 @@ io.on('connection', socket => {
     if (g.phase !== 'idle' && g.phase !== 'done') return toast('本局進行中，下一局再入座');
     if (g.seats.length >= 6) return toast('這桌已經坐滿了');
     if (u().bal < t.base) return toast('籌碼不足，請先申請籌碼');
-    g.seats.push({ uid, grab: null, bet: null }); pushTable(cur); pushLobby();
+    g.seats.push({ uid, grab: null, bet: null, ready: false }); pushTable(cur); pushLobby();
   });
   socket.on('stand', () => {
     if (!cur) return; const g = rt(cur), s = g.seats.find(x => x.uid === uid); if (!s) return;
     if (g.phase === 'idle' || g.phase === 'done') g.seats = g.seats.filter(x => x.uid !== uid); else s.leave = true;
     pushTable(cur); pushLobby();
+  });
+  socket.on('ready', () => {
+    if (!cur) return; const g = rt(cur), s = g.seats.find(x => x.uid === uid);
+    if (!s || g.phase !== 'idle' || ownerOf(g) === uid) return;
+    s.ready = !s.ready; pushTable(cur);
+  });
+  socket.on('start', () => {
+    if (!cur) return; const g = rt(cur);
+    if (g.phase !== 'idle') return;
+    if (ownerOf(g) !== uid) return toast('只有房主可以開始遊戲');
+    if (g.seats.length < 2) return toast('至少需要 2 位玩家入座');
+    const notReady = g.seats.filter(s => s.uid !== uid && !s.ready);
+    if (notReady.length) return toast('還有 ' + notReady.length + ' 位玩家尚未準備');
+    startRound(cur);
+  });
+  socket.on('setGrab', ({ sec } = {}) => {
+    if (!cur) return; const g = rt(cur); sec = Math.round(Number(sec));
+    if (ownerOf(g) !== uid) return toast('只有房主可以調整設定');
+    if (!(sec >= 5 && sec <= 10)) return;
+    if (g.phase === 'grab' || g.phase === 'bet') return toast('牌局進行中，結束後再調整');
+    S.tables[cur].grabSec = sec; save(); pushTable(cur); toast('搶莊時間已改為 ' + sec + ' 秒');
   });
   socket.on('grab', ({ v } = {}) => {
     if (!cur) return; const g = rt(cur), s = g.seats.find(x => x.uid === uid); v = Number(v);

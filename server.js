@@ -58,8 +58,10 @@ async function ensureAdmin() {
     console.log('已建立管理員帳號：' + ADMIN_USER);
   } else if (!a.admin) a.admin = true;
   if (!Object.keys(S.tables).length) {
-    const t = { id: newId(), name: '一號桌', base: 10 };
+    const t = { id: newId(), name: '一號桌', base: 10, game: 'niuniu' };
     S.tables[t.id] = t;
+    const t2 = { id: newId(), name: '推筒子一號桌', base: 10, game: 'tuitong' };
+    S.tables[t2.id] = t2;
   }
   save();
 }
@@ -127,20 +129,29 @@ function rt(tid) {
 }
 const online = uid => (io.sockets.adapter.rooms.get('u:' + uid)?.size || 0) > 0;
 const ownerOf = g => (g.seats.find(s => online(s.uid)) || g.seats[0] || {}).uid || null;
-const SERIES_OPTS = [3, 5, 10]; // 房主可選的每輪局數
-const seriesOf = tid => SERIES_OPTS.includes(Number(S.tables[tid]?.series)) ? Number(S.tables[tid].series) : 5;
+// 遊戲種類：niuniu 牛牛 / tuitong 推筒子
+const gameOf = tid => S.tables[tid]?.game === 'tuitong' ? 'tuitong' : 'niuniu';
+const SERIES_OPTS = { niuniu: [3, 5, 10], tuitong: [4, 8, 12] }; // 房主可選的每輪局數
+const seriesOptsOf = tid => SERIES_OPTS[gameOf(tid)];
+const seriesOf = tid => { const o = seriesOptsOf(tid), v = Number(S.tables[tid]?.series); return o.includes(v) ? v : (gameOf(tid) === 'tuitong' ? 4 : 5); };
+const maxSeatsOf = tid => gameOf(tid) === 'tuitong' ? 4 : 6;
+const MAXX_OPTS = [5, 10, 20]; // 推筒子下注上限 = 最低下注 × 倍數
+const maxXOf = tid => MAXX_OPTS.includes(Number(S.tables[tid]?.maxX)) ? Number(S.tables[tid].maxX) : 10;
+const isPlaying = g => ['grab', 'bet', 'tbet'].includes(g.phase);
 const grabSecOf = tid => { const v = Number(S.tables[tid]?.grabSec); return v >= 5 && v <= 10 ? v : 8; };
 function pubTable(tid) {
   const t = S.tables[tid], g = rt(tid);
   return {
     id: tid, name: t.name, base: t.base, phase: g.phase, round: g.round, banker: g.banker, grabMult: g.grabMult,
+    game: gameOf(tid), maxSeats: maxSeatsOf(tid), seriesOpts: seriesOptsOf(tid), maxX: maxXOf(tid), maxBet: t.base * maxXOf(tid),
+    wall: g.wall ? g.wall.length : null, shoeHand: g.shoeHand || 0, dice: g.dice || null, startUid: g.startUid || null,
     deadline: g.deadline, now: Date.now(), results: g.results, owner: ownerOf(g), seriesNo: g.seriesNo || 0, seriesTotal: g.seriesNo ? (g.seriesLen || seriesOf(tid)) : seriesOf(tid), grabSec: grabSecOf(tid),
     seats: g.seats.map(s => ({ uid: s.uid, name: S.users[s.uid]?.name || '玩家', bal: S.users[s.uid]?.bal || 0, grab: s.grab, bet: s.bet, ready: !!s.ready, leave: !!s.leave, online: online(s.uid) })),
   };
 }
 const pushTable = tid => S.tables[tid] && io.to('t:' + tid).emit('table', pubTable(tid));
 function lobby() {
-  return Object.values(S.tables).map(t => ({ id: t.id, name: t.name, base: t.base, players: rt(t.id).seats.length, phase: rt(t.id).phase }));
+  return Object.values(S.tables).map(t => ({ id: t.id, name: t.name, base: t.base, game: gameOf(t.id), maxSeats: maxSeatsOf(t.id), players: rt(t.id).seats.length, phase: rt(t.id).phase }));
 }
 const pushLobby = () => io.emit('lobby', lobby());
 function meInfo(uid) {
@@ -191,10 +202,17 @@ function penalize(tid, uid, why) {
 }
 
 // ---------------- 遊戲流程 ----------------
+function endSeries(tid) {
+  const g = rt(tid);
+  g.seats.forEach(s => { s.ready = false; }); g.seriesNo = 0;
+  g.phase = 'idle'; g.deadline = null; g.results = null; g.banker = null; g.dice = null;
+  pushTable(tid); pushLobby();
+}
 function startRound(tid) {
   const t = S.tables[tid], g = rt(tid);
   g.seats = g.seats.filter(s => !s.leave && online(s.uid) && (S.users[s.uid]?.bal || 0) >= t.base);
-  if (g.seats.length < 2) { g.phase = 'idle'; g.deadline = null; g.seriesNo = 0; g.results = null; g.banker = null; g.seats.forEach(s => { s.ready = false; }); pushTable(tid); pushLobby(); return; }
+  if (g.seats.length < 2) return endSeries(tid);
+  if (gameOf(tid) === 'tuitong') return ttStart(tid);
   const deck = []; for (let r = 1; r <= 13; r++) for (let s = 0; s < 4; s++) deck.push({ r, s });
   for (let i = deck.length - 1; i > 0; i--) { const j = rnd(i + 1); [deck[i], deck[j]] = [deck[j], deck[i]]; }
   g.round++; g.hands = {}; g.results = null; g.banker = null; g.grabMult = 1;
@@ -230,12 +248,70 @@ function showdown(tid) {
   g.phase = 'done'; g.deadline = Date.now() + 9000;
   save(); pushTable(tid); for (const s of g.seats) pushMe(s.uid); pushAdmin();
 }
+// ---------------- 推筒子 ----------------
+// 牌：0 = 白板，1～9 = 一～九筒，各 4 張共 40 張；每 4 把重新洗牌（避免算牌）
+const CNN = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+const TT_SHOE = 4;
+function ttEval(tiles) {
+  const [a, b] = tiles, half = v => v === 0 ? 1 : v * 2;
+  if (a === b) return { pair: true, rank: 100 + (a === 0 ? 10 : a), mult: a === 0 ? 3 : 2, name: a === 0 ? '白板對' : CNN[a] + '筒對', key: 0, bie: false };
+  const pts = (half(a) + half(b)) % 20, key = Math.max(half(a), half(b));
+  const name = pts === 0 ? '鱉十' : (pts % 2 ? (pts === 1 ? '半點' : CNN[(pts - 1) / 2] + '點半') : CNN[pts / 2] + '點');
+  return { pair: false, rank: pts, mult: 1, name, key, bie: pts === 0 };
+}
+const ttCmp = (a, b) => a.rank - b.rank; // 平點（含同樣對子）一律莊家贏
+function ttStart(tid) {
+  const g = rt(tid), n = g.seats.length;
+  g.round++; g.results = null; g.dice = null; g.startUid = null; g.hands = {};
+  let idx;
+  if (!g.lastBanker) idx = Math.max(0, g.seats.findIndex(s => s.uid === ownerOf(g)));
+  else { const li = g.seats.findIndex(s => s.uid === g.lastBanker); idx = li >= 0 ? (li + 1) % n : (g.lastBankerIdx || 0) % n; }
+  g.banker = g.seats[idx].uid; g.lastBanker = g.banker; g.lastBankerIdx = idx;
+  g.seats.forEach(s => { s.bet = null; s.grab = null; });
+  if (!g.wall || (g.shoeHand || 0) >= TT_SHOE || g.wall.length < n * 2) {
+    const w = []; for (let v = 0; v <= 9; v++) for (let k = 0; k < 4; k++) w.push(v);
+    for (let i = w.length - 1; i > 0; i--) { const j = rnd(i + 1); [w[i], w[j]] = [w[j], w[i]]; }
+    g.wall = w; g.shoeHand = 0;
+  }
+  g.shoeHand++;
+  g.phase = 'tbet'; g.deadline = Date.now() + grabSecOf(tid) * 1000;
+  pushTable(tid); pushLobby();
+}
+function ttShowdown(tid) {
+  const t = S.tables[tid], g = rt(tid), B = g.banker, n = g.seats.length;
+  const bal = uid => S.users[uid]?.bal || 0;
+  g.seats.forEach(s => { if (s.uid !== B && s.bet == null) s.bet = Math.min(t.base, bal(s.uid)); });
+  // 擲骰決定從哪一家開始發牌（從莊家起算）
+  const d1 = rnd(6) + 1, d2 = rnd(6) + 1; g.dice = [d1, d2];
+  const bi = g.seats.findIndex(s => s.uid === B), start = (bi + (d1 + d2 - 1)) % n;
+  g.startUid = g.seats[start].uid;
+  for (let k = 0; k < n; k++) { const s = g.seats[(start + k) % n]; g.hands[s.uid] = [g.wall.shift(), g.wall.shift()]; }
+  const ev = {}; g.seats.forEach(s => ev[s.uid] = ttEval(g.hands[s.uid]));
+  const delta = {}, owed = []; let inB = 0;
+  for (const s of g.seats) {
+    if (s.uid === B) continue;
+    const win = ev[B].bie ? true : ttCmp(ev[s.uid], ev[B]) > 0; // 莊家鱉十通賠；平點莊家贏
+    const amt = s.bet * (win ? ev[s.uid].mult : ev[B].mult);
+    if (win) owed.push([s.uid, amt]); else { const l = Math.min(amt, bal(s.uid)); delta[s.uid] = -l; inB += l; }
+  }
+  const tot = owed.reduce((a, x) => a + x[1], 0), avail = bal(B) + inB, f = tot > avail ? avail / tot : 1; let outB = 0;
+  owed.forEach(([u, a]) => { const p = Math.floor(a * f); delta[u] = p; outB += p; });
+  delta[B] = inB - outB;
+  for (const s of g.seats) if (S.users[s.uid]) S.users[s.uid].bal = Math.max(0, bal(s.uid) + (delta[s.uid] || 0));
+  g.results = g.seats.map(s => ({ uid: s.uid, name: S.users[s.uid]?.name || '玩家', tiles: g.hands[s.uid], hand: ev[s.uid].name, mult: ev[s.uid].mult, pair: ev[s.uid].pair, bie: ev[s.uid].bie, delta: delta[s.uid] || 0, bet: s.bet }));
+  S.history.unshift({ round: g.round, table: t.name, at: Date.now(), bankerName: S.users[B]?.name || '', res: g.results.map(r => ({ uid: r.uid, hand: r.hand, delta: r.delta })) });
+  S.history = S.history.slice(0, 300);
+  g.phase = 'done'; g.deadline = Date.now() + 12000;
+  save(); pushTable(tid); for (const s of g.seats) pushMe(s.uid); pushAdmin();
+}
+
 setInterval(() => {
   const now = Date.now();
   for (const tid in G) {
     const g = G[tid]; if (!S.tables[tid]) { delete G[tid]; continue; }
     if (g.phase === 'grab' && (g.seats.every(s => s.grab != null) || now > g.deadline)) resolveBanker(tid);
     else if (g.phase === 'bet' && (g.seats.every(s => s.uid === g.banker || s.bet != null) || now > g.deadline)) showdown(tid);
+    else if (g.phase === 'tbet' && (g.seats.every(s => s.uid === g.banker || s.bet != null) || now > g.deadline)) ttShowdown(tid);
     else if (g.phase === 'done' && now > g.deadline) {
       if ((g.seriesNo || 0) < (g.seriesLen || seriesOf(tid))) {
         const gone = g.seats.filter(s => !s.leave && !online(s.uid));
@@ -244,11 +320,7 @@ setInterval(() => {
       }
       g.seats = g.seats.filter(s => !s.leave && online(s.uid));
       if ((g.seriesNo || 0) < (g.seriesLen || seriesOf(tid)) && g.seats.length >= 2) { g.seriesNo++; startRound(tid); }
-      else {
-        g.seats.forEach(s => { s.ready = false; }); g.seriesNo = 0;
-        g.phase = 'idle'; g.deadline = null; g.results = null; g.banker = null;
-        pushTable(tid); pushLobby();
-      }
+      else endSeries(tid);
     } else if (g.phase === 'idle') {
       // 斷線超過 15 秒的玩家離座，房主自動由下一位遞補
       let changed = false;
@@ -288,7 +360,7 @@ io.on('connection', socket => {
     if (g.seats.some(s => s.uid === uid)) return;
     for (const tid in G) if (G[tid].seats.some(s => s.uid === uid)) return toast('你已經坐在其他牌桌');
     if (g.phase !== 'idle') return toast('這一輪牌局進行中，結束後再入座');
-    if (g.seats.length >= 6) return toast('這桌已經坐滿了');
+    if (g.seats.length >= maxSeatsOf(cur)) return toast('這桌已經坐滿了');
     if (u().bal < t.base) return toast('籌碼不足，請先申請籌碼');
     g.seats.push({ uid, grab: null, bet: null, ready: false }); pushTable(cur); pushLobby();
   });
@@ -310,21 +382,35 @@ io.on('connection', socket => {
     if (g.seats.length < 2) return toast('至少需要 2 位玩家入座');
     const notReady = g.seats.filter(s => s.uid !== uid && !s.ready);
     if (notReady.length) return toast('還有 ' + notReady.length + ' 位玩家尚未準備');
-    g.seriesNo = 1; g.seriesLen = seriesOf(cur); startRound(cur);
+    g.seriesNo = 1; g.seriesLen = seriesOf(cur); g.lastBanker = null; g.lastBankerIdx = null; g.wall = null; startRound(cur);
   });
   socket.on('setGrab', ({ sec } = {}) => {
     if (!cur) return; const g = rt(cur); sec = Math.round(Number(sec));
     if (ownerOf(g) !== uid) return toast('只有房主可以調整設定');
     if (!(sec >= 5 && sec <= 10)) return;
-    if (g.phase === 'grab' || g.phase === 'bet') return toast('牌局進行中，結束後再調整');
-    S.tables[cur].grabSec = sec; save(); pushTable(cur); toast('搶莊時間已改為 ' + sec + ' 秒');
+    if (isPlaying(g)) return toast('牌局進行中，結束後再調整');
+    S.tables[cur].grabSec = sec; save(); pushTable(cur); toast((gameOf(cur) === 'tuitong' ? '下注' : '搶莊') + '時間已改為 ' + sec + ' 秒');
   });
   socket.on('setSeries', ({ n } = {}) => {
     if (!cur) return; const g = rt(cur); n = Math.round(Number(n));
     if (ownerOf(g) !== uid) return toast('只有房主可以調整設定');
-    if (!SERIES_OPTS.includes(n)) return;
+    if (!seriesOptsOf(cur).includes(n)) return;
     if (g.seriesNo) return toast('這一輪進行中，打完再調整');
-    S.tables[cur].series = n; save(); pushTable(cur); toast('每輪局數已改為 ' + n + ' 局');
+    S.tables[cur].series = n; save(); pushTable(cur); toast('每輪局數已改為 ' + n + (gameOf(cur) === 'tuitong' ? ' 把' : ' 局'));
+  });
+  socket.on('setMaxX', ({ x } = {}) => {
+    if (!cur) return; const g = rt(cur); x = Math.round(Number(x));
+    if (ownerOf(g) !== uid) return toast('只有房主可以調整設定');
+    if (!MAXX_OPTS.includes(x) || gameOf(cur) !== 'tuitong') return;
+    if (isPlaying(g)) return toast('牌局進行中，結束後再調整');
+    S.tables[cur].maxX = x; save(); pushTable(cur); toast('下注上限已改為 ' + (S.tables[cur].base * x).toLocaleString());
+  });
+  socket.on('tbet', ({ v } = {}) => {
+    if (!cur) return; const g = rt(cur), t = S.tables[cur], s = g.seats.find(x => x.uid === uid);
+    if (g.phase !== 'tbet' || !s || uid === g.banker || s.bet != null) return;
+    v = Math.round(Number(v)); const hi = Math.min(t.base * maxXOf(cur), u().bal), lo = Math.min(t.base, u().bal);
+    if (!(v >= lo && v <= hi)) return toast(`下注金額需在 ${lo.toLocaleString()} 到 ${hi.toLocaleString()} 之間`);
+    s.bet = v; pushTable(cur);
   });
   socket.on('grab', ({ v } = {}) => {
     if (!cur) return; const g = rt(cur), s = g.seats.find(x => x.uid === uid); v = Number(v);
@@ -368,20 +454,21 @@ io.on('connection', socket => {
     for (const k in S.sessions) if (S.sessions[k] === target) delete S.sessions[k];
     save(); toast('已重設密碼');
   });
-  socket.on('createTable', ({ name, base } = {}) => {
+  socket.on('createTable', ({ name, base, game } = {}) => {
     if (!isAdmin()) return; name = String(name || '').trim().slice(0, 16) || '新牌桌'; base = Math.round(Number(base));
     if (![10, 50, 100, 500, 1000].includes(base)) base = 10;
-    const id = newId(); S.tables[id] = { id, name, base }; save(); pushLobby(); toast('已建立牌桌');
+    game = game === 'tuitong' ? 'tuitong' : 'niuniu';
+    const id = newId(); S.tables[id] = { id, name, base, game }; save(); pushLobby(); toast('已建立牌桌');
   });
   socket.on('editTable', ({ tid, base } = {}) => {
     if (!isAdmin() || !S.tables[tid]) return; const g = rt(tid);
-    if (g.phase === 'grab' || g.phase === 'bet') return toast('牌局進行中，結束後再改');
+    if (isPlaying(g)) return toast('牌局進行中，結束後再改');
     base = Math.round(Number(base)); if (![10, 50, 100, 500, 1000].includes(base)) return;
     S.tables[tid].base = base; save(); pushTable(tid); pushLobby();
   });
   socket.on('deleteTable', ({ tid } = {}) => {
     if (!isAdmin() || !S.tables[tid]) return; const g = rt(tid);
-    if (g.phase === 'grab' || g.phase === 'bet') return toast('牌局進行中，結束後再刪');
+    if (isPlaying(g)) return toast('牌局進行中，結束後再刪');
     delete S.tables[tid]; delete G[tid]; io.to('t:' + tid).emit('kicked'); save(); pushLobby(); toast('已刪除牌桌');
   });
   socket.on('logout', () => {
@@ -391,6 +478,8 @@ io.on('connection', socket => {
 });
 
 load().then(ensureAdmin).then(() => {
-  server.listen(PORT, () => console.log('牛牛伺服器啟動於 port ' + PORT));
+  // 舊資料只有牛牛桌時，自動補一張推筒子桌
+  if (!Object.values(S.tables).some(t => t.game === 'tuitong')) { const t = { id: newId(), name: '推筒子一號桌', base: 10, game: 'tuitong' }; S.tables[t.id] = t; save(); }
+  server.listen(PORT, () => console.log('哪有小孩天天輸 伺服器啟動於 port ' + PORT));
 }).catch(e => { console.error('啟動失敗', e); process.exit(1); });
 process.on('SIGTERM', async () => { clearTimeout(saveTimer); await flush(); process.exit(0); });

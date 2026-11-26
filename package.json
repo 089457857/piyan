@@ -1,0 +1,18 @@
+{
+  "name": "niuniu-online",
+  "version": "1.0.0",
+  "description": "牛牛線上牌桌：管理員發放虛擬籌碼，玩家即時連線對戰",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.2",
+    "pg": "^8.13.1",
+    "socket.io": "^4.8.1"
+  }
+}

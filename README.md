@@ -1,0 +1,100 @@
+# 牛牛線上牌桌：架設到 Render 的教學
+
+任何人打開網址、用暱稱和密碼註冊就能玩，不需要 claude.ai 帳號。
+籌碼由管理員核准發放，只用來記分，不能兌換任何財物。
+
+整個過程大約 15 分鐘，不需要寫程式。你會用到兩個免費帳號：
+
+- **GitHub**：存放遊戲程式碼。
+- **Render**：讓遊戲在網路上跑起來。
+
+---
+
+## 第一步：把程式碼放上 GitHub
+
+1. 到 https://github.com 註冊並登入。
+2. 按右上角「＋」→「New repository」。
+3. Repository name 填 `niuniu`，選 **Private**（只有你看得到程式碼），按「Create repository」。
+4. 在新頁面找到「uploading an existing file」連結，點進去。
+5. 把解壓縮後資料夾裡的**所有內容**拖進上傳區，包括：
+   - `public` 資料夾（裡面有 `index.html`）
+   - `server.js`
+   - `package.json`
+   - `package-lock.json`
+   - `render.yaml`
+   - `README.md`
+6. 確認上傳清單裡有 `public/index.html`，再按下方綠色的「Commit changes」。
+
+> 只看到 `index.html`、沒有 `public/` 這個資料夾的話，就是資料夾沒有一起拖進去。請重新上傳整個 `public` 資料夾。
+
+## 第二步：在 Render 建立遊戲
+
+1. 到 https://render.com，按「Get Started」，選 **用 GitHub 登入**，並允許 Render 讀取你的 repository。
+2. 登入後按右上角「New」→「**Blueprint**」。
+3. 選擇剛剛建立的 `niuniu` repository，按「Connect」。
+4. Render 會讀到 `render.yaml`，自動列出兩項：
+   - `niuniu`：遊戲伺服器
+   - `niuniu-db`：資料庫，存帳號和籌碼
+5. 畫面會要求填 **ADMIN_PASSWORD**，這是管理員密碼。請設一組只有你知道的密碼，至少 8 個字。
+6. 按「Apply」（或「Deploy Blueprint」），等 3～5 分鐘。
+7. 點進 `niuniu` 服務，頁面上方會顯示網址，類似 `https://niuniu-xxxx.onrender.com`，這就是遊戲網址。
+
+## 第三步：登入管理員、邀請朋友
+
+1. 打開遊戲網址，用以下帳密登入：
+   - 暱稱：`admin`
+   - 密碼：你剛剛設定的 ADMIN_PASSWORD
+2. 「大廳」已經預設一張「一號桌」。你也可以到「管理後台」新增牌桌，或調整底注。
+3. 把遊戲網址用 LINE 或其他方式傳給朋友。
+4. 朋友打開網址 → 按「註冊」→ 到「我的籌碼」送出申請。
+5. 你在「管理後台」的「待審核申請」按「核准」。
+6. 大家進入同一張牌桌按「入座」，兩人以上就會在 5 秒後自動開局。
+
+## 管理後台能做的事
+
+| 功能 | 說明 |
+|---|---|
+| 核准／拒絕申請 | 玩家一次只能有一筆申請在審核中 |
+| 調整籌碼 | 輸入正數是加發，負數是扣回 |
+| 重設密碼 | 玩家忘記密碼時，幫他設一組新的 |
+| 設為管理員 | 讓信任的人一起幫忙核准 |
+| 牌桌管理 | 新增、刪除牌桌，修改底注 |
+| 籌碼紀錄 | 每一筆發放和調整，以及經手人 |
+
+## 免費方案的限制（請先知道）
+
+- **休眠：** 15 分鐘沒有人連線，伺服器就會休眠。下一個人打開網址時要等**約 1 分鐘**才會醒來，之後就正常了。這期間牌局資料都還在。
+- **資料庫 30 天到期：** Render 的免費資料庫建立 30 天後會到期，到期後帳號和籌碼都會消失。如果想繼續使用：
+  - 升級成付費資料庫，或
+  - 在 Render 刪掉舊資料庫、重新建立，等於從頭開始。
+- **進行中的牌局：** 伺服器重啟時，正在進行的那一局會作廢，但已經結算的籌碼都保存在資料庫裡。
+
+驗證點子階段，這些限制通常不是問題。真的要長期使用時，伺服器和資料庫各升級到最低付費方案，就不會休眠也不會到期。
+
+## 之後要修改遊戲
+
+在 GitHub 上修改檔案並 Commit，Render 會自動重新部署，大約 2～3 分鐘後網址上就是新版本。
+
+## 遇到問題
+
+- **網址打開一直轉圈：** 伺服器正在從休眠中醒來，等 1 分鐘再重新整理。
+- **管理員帳號登不進去：**
+  1. 到 Render → `niuniu` → 「Environment」，確認 `ADMIN_PASSWORD` 有值。
+  2. 改完後按「Manual Deploy」重新部署。
+  3. 注意：管理員帳號只在**第一次**啟動時建立，之後再改 ADMIN_PASSWORD 不會改到已建立帳號的密碼。忘記密碼時，可以請另一位管理員在後台幫你重設。
+- **Blueprint 失敗：** 可以改成手動建立。
+  1. 「New」→「Postgres」，選 Free，建好後複製「Internal Database URL」。
+  2. 「New」→「Web Service」，選你的 repository，填入：
+     - Build Command：`npm install`
+     - Start Command：`node server.js`
+     - Instance Type：Free
+  3. 在 Environment 加三個變數：
+     - `DATABASE_URL`：剛剛複製的網址
+     - `ADMIN_USER`：`admin`
+     - `ADMIN_PASSWORD`：你的密碼
+- **想在自己電腦上先試：** 安裝 Node.js 18 以上版本，在資料夾裡執行以下指令，再打開 http://localhost:3000 。沒有設定資料庫時，資料會存在 `data.json`。
+
+  ```
+  npm install
+  ADMIN_PASSWORD=你的密碼 node server.js
+  ```

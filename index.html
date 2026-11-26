@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>牛牛線上牌桌</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Noto+Serif+TC:wght@900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a1f19;--panel:#12302a;--line:#2a5247;--ink:#f3efe4;--dim:#a9c2b8;--felt:#0d4a3a;--gold:#e9b949;--red:#c8202f;--ok:#4fd18b;color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Noto Sans TC",system-ui,sans-serif;overflow-x:clip}
+.wrap{max-width:1100px;margin:0 auto;padding:clamp(14px,3vw,32px) max(4vw,12px) 48px}
+header{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between;margin-bottom:14px}
+h1{margin:0;font:900 clamp(28px,4.5vw,40px)/1.05 "Noto Serif TC",serif}
+h1 small{font:400 14px "Noto Sans TC";color:var(--dim);margin-left:8px}
+.me{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px 14px}
+.chip{width:30px;height:30px;border-radius:50%;background:radial-gradient(circle,var(--gold) 0 40%,#b8871f 41% 52%,var(--gold) 53%);box-shadow:0 2px 0 #7a5a12;flex:none}
+.bal{font:900 22px/1 "Noto Sans TC";color:var(--gold);font-variant-numeric:tabular-nums;white-space:nowrap}
+.role{font-size:12px;padding:2px 8px;border-radius:99px;background:#ffffff14;color:var(--dim);white-space:nowrap}
+.role.admin{background:var(--gold);color:#2a1d00;font-weight:700}
+nav{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.btn{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:700 15px "Noto Sans TC",sans-serif;border-radius:12px;min-height:44px;padding:0 16px;cursor:pointer;white-space:nowrap}
+.btn:hover:not(:disabled){border-color:var(--gold)}
+.btn:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.on,.btn.pri{background:var(--gold);color:#2a1d00;border-color:var(--gold)}
+.btn.red{background:#5a1a20;border-color:#8a2a33}
+.btn.sm{min-height:36px;padding:0 12px;font-size:14px}
+input,select{font:16px "Noto Sans TC",sans-serif;background:#0a1f19;color:var(--ink);border:1px solid var(--line);border-radius:10px;min-height:44px;padding:0 12px}
+.felt{background:radial-gradient(120% 90% at 50% 30%,#13664f 0%,var(--felt) 55%,#08342a 100%);border:10px solid #4a2616;border-radius:28px;box-shadow:inset 0 0 60px #0008,0 20px 40px -20px #000;padding:clamp(14px,2.5vw,26px)}
+.center{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 18px;padding-bottom:14px;border-bottom:1px dashed #ffffff26;margin-bottom:16px}
+.phase{font:900 clamp(22px,3.5vw,30px)/1.1 "Noto Serif TC",serif}
+.sub{color:var(--dim);font-size:14px}
+.timer{font:900 28px/1 "Noto Sans TC";color:var(--gold);font-variant-numeric:tabular-nums;min-width:2.5em;text-align:right}
+.seats{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:12px}
+.seat{background:#00000038;border:1px solid #ffffff1c;border-radius:16px;padding:12px;min-height:150px;display:flex;flex-direction:column;gap:8px}
+.seat.mine{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
+.seat.off{opacity:.55}
+.seat.empty{display:grid;place-items:center;color:#ffffff55;font-size:14px;border-style:dashed}
+.top{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.nm{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{font-size:12px;padding:1px 8px;border-radius:99px;background:#ffffff1a;white-space:nowrap}
+.tag.bk{background:var(--gold);color:#2a1d00;font-weight:700}
+.sb{font-size:13px;color:var(--dim);display:flex;gap:10px;flex-wrap:wrap}
+.sb b{color:var(--gold);font-variant-numeric:tabular-nums}
+.hand{display:flex;gap:4px}
+.hand .gap{width:8px;flex:none}
+.card{width:42px;height:60px;border-radius:6px;background:#fbf8ef;color:#1b1b1b;position:relative;box-shadow:0 2px 0 #0004;flex:none;font-weight:900}
+.card .r{position:absolute;left:4px;top:2px;font-size:14px;line-height:1}
+.card .s{position:absolute;inset:0;display:grid;place-items:center;font-size:22px;padding-top:8px}
+.card.red{color:var(--red)}
+.card.back{background:repeating-linear-gradient(45deg,#7a1b24 0 5px,#9b2630 5px 10px);border:2px solid #fbf8ef}
+.res{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.hn{font:900 18px "Noto Serif TC",serif}
+.dl{font-weight:900;font-variant-numeric:tabular-nums;white-space:nowrap}
+.p{color:var(--ok)}.n{color:#ff8a8a}
+.acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:16px;padding-top:14px;border-top:1px dashed #ffffff26}
+.lab{color:var(--dim);font-size:14px;margin-right:4px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px}
+.box h2{margin:0 0 12px;font:900 22px/1.2 "Noto Serif TC",serif}
+.big{font:900 clamp(40px,7vw,56px)/1 "Noto Sans TC";color:var(--gold);font-variant-numeric:tabular-nums}
+form{display:grid;gap:10px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tables{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:14px}
+.tcard{background:radial-gradient(120% 120% at 50% 0%,#13664f,var(--felt));border:6px solid #4a2616;border-radius:22px;padding:18px;display:grid;gap:8px}
+.tcard h3{margin:0;font:900 24px "Noto Serif TC",serif}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{color:var(--dim);font-weight:400;font-size:13px}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.scroll{overflow-x:auto}
+.empty-msg{color:var(--dim);font-size:14px;padding:8px 0}
+.st{font-size:13px;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.st.pending{background:#e9b94933;color:var(--gold)}.st.approved{background:#4fd18b26;color:var(--ok)}.st.rejected{background:#ff8a8a22;color:#ff8a8a}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#000d;border:1px solid var(--gold);padding:10px 18px;border-radius:12px;z-index:9;max-width:90vw;text-align:center}
+.auth{max-width:420px;margin:6vh auto 0}
+.err{color:#ff8a8a;font-size:14px;min-height:1.4em}
+.note{font-size:13px;color:var(--dim);margin-top:14px}
+.conn{background:#5a1a20aa;border:1px solid #8a2a33;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:14px}
+[hidden]{display:none!important}
+@media(max-width:600px){.seat.empty{min-height:48px}.card{width:34px;height:49px}.card .r{font-size:12px}.card .s{font-size:18px}.felt{border-width:6px;border-radius:20px}
+ table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--line)}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:6.5em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:6em;margin-inline-start:-6.5em;color:var(--dim)}}
+@media(prefers-reduced-motion:no-preference){.card.flip{animation:flip .35s ease-out both}@keyframes flip{from{transform:rotateY(90deg)}to{transform:none}}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>牛牛牌桌<small>線上連線 · 虛擬籌碼</small></h1>
+    <div class="me" id="meBox" hidden><span class="chip"></span><div><div class="sub" id="meName"></div><div class="bal" id="meBal">0</div></div><span class="role" id="meRole">玩家</span><button class="btn sm" id="logout">登出</button></div>
+  </header>
+
+  <section id="v-auth" class="auth box">
+    <h2 id="authTitle">登入</h2>
+    <form id="authForm">
+      <input id="aName" placeholder="暱稱" autocomplete="username" required maxlength="16" aria-label="暱稱">
+      <input id="aPass" type="password" placeholder="密碼" autocomplete="current-password" required maxlength="64" aria-label="密碼">
+      <div class="err" id="aErr"></div>
+      <button class="btn pri" type="submit" id="aBtn">登入</button>
+      <button class="btn" type="button" id="aSwitch">還沒有帳號？註冊</button>
+    </form>
+    <p class="note">籌碼只是遊戲內的記分，由管理員發放，不能兌換任何財物。</p>
+  </section>
+
+  <div id="app" hidden>
+    <div class="conn" id="conn" hidden>連線中斷，正在重新連線…（伺服器若在休眠，約需一分鐘喚醒）</div>
+    <nav>
+      <button class="btn on" data-v="lobby">大廳</button>
+      <button class="btn" data-v="chips">我的籌碼</button>
+      <button class="btn" data-v="admin" id="adminNav" hidden>管理後台 <span id="pend"></span></button>
+    </nav>
+
+    <section id="v-lobby"><div class="tables" id="tables"></div></section>
+
+    <section id="v-table" hidden>
+      <div class="felt">
+        <div class="center">
+          <div><div class="phase" id="phase"></div><div class="sub" id="phaseSub"></div></div>
+          <div class="row"><div class="timer" id="timer"></div><button class="btn sm" id="back">回大廳</button></div>
+        </div>
+        <div class="seats" id="seats"></div>
+        <div class="acts" id="acts"></div>
+      </div>
+      <p class="note">牌型：五小牛 ×5 ＞ 炸彈 ×4 ＞ 五花牛 ×4 ＞ 牛牛 ×3 ＞ 牛九～牛七 ×2 ＞ 牛六～牛一、沒牛 ×1。同牌型比最大張，再比花色 ♠＞♥＞♣＞♦。輸贏 = 底注 × 搶莊倍數 × 下注倍數 × 贏家牌型倍數。兩人以上入座就會自動開局。</p>
+    </section>
+
+    <section id="v-chips" hidden>
+      <div class="grid2">
+        <div class="box">
+          <h2>我的籌碼</h2>
+          <div class="big" id="chipBig">0</div>
+          <form id="reqForm" style="margin-top:14px">
+            <div class="row"><input id="reqAmt" type="number" min="10" max="100000" step="10" value="1000" style="width:9em" aria-label="申請數量"><span class="sub">枚</span></div>
+            <input id="reqNote" maxlength="80" placeholder="給管理員的留言（選填）" aria-label="留言">
+            <button class="btn pri" type="submit">送出申請</button>
+          </form>
+          <div id="myReqs" style="margin-top:14px"></div>
+        </div>
+        <div class="box"><h2>最近牌局</h2><div id="myHist" class="scroll"></div></div>
+      </div>
+    </section>
+
+    <section id="v-admin" hidden>
+      <div class="grid2">
+        <div class="box"><h2>待審核申請</h2><div id="aReqs"></div></div>
+        <div class="box"><h2>牌桌</h2><div id="aTables"></div>
+          <form id="newTable" class="row" style="margin-top:12px;display:flex"><input id="ntName" placeholder="牌桌名稱" maxlength="16" style="flex:1" aria-label="牌桌名稱"><select id="ntBase" aria-label="底注"></select><button class="btn pri" type="submit">新增</button></form>
+        </div>
+      </div>
+      <div class="box" style="margin-top:16px"><h2>玩家</h2><div id="aUsers"></div></div>
+      <div class="box" style="margin-top:16px"><h2>籌碼紀錄</h2><div id="aLedger" class="scroll"></div></div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+{
+const $=s=>document.querySelector(s);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>Number(n||0).toLocaleString();
+const SU=['♦','♣','♥','♠'],RK=['','A','2','3','4','5','6','7','8','9','10','J','Q','K'],BASES=[10,50,100,500,1000];
+const PH={idle:'等待開局',grab:'搶莊中',bet:'下注中',done:'本局結算'};
+let token=null;try{token=localStorage.getItem('nn-token')}catch(e){}
+let sock=null,me=null,lobby=[],table=null,hand=null,adm=null,view='lobby',skew=0,regMode=false,toastT=0;
+
+function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600)}
+function show(v){view=v;for(const k of ['lobby','table','chips','admin'])$('#v-'+k).hidden=k!==v;document.querySelectorAll('nav .btn').forEach(b=>b.classList.toggle('on',b.dataset.v===v||(v==='table'&&b.dataset.v==='lobby')))}
+$('#ntBase').innerHTML=BASES.map(b=>`<option value="${b}">底注 ${b}</option>`).join('');
+
+// ---------- auth ----------
+function setMode(r){regMode=r;$('#authTitle').textContent=r?'註冊新帳號':'登入';$('#aBtn').textContent=r?'註冊並登入':'登入';$('#aSwitch').textContent=r?'已經有帳號？登入':'還沒有帳號？註冊';$('#aPass').autocomplete=r?'new-password':'current-password';$('#aErr').textContent=''}
+$('#aSwitch').onclick=()=>setMode(!regMode);
+$('#authForm').onsubmit=async e=>{e.preventDefault();$('#aErr').textContent='';$('#aBtn').disabled=true;
+  try{const r=await fetch(regMode?'/api/register':'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:$('#aName').value,pass:$('#aPass').value})});const j=await r.json();
+    if(!r.ok)throw new Error(j.error||'失敗');token=j.token;try{localStorage.setItem('nn-token',token)}catch(e){}connect()}
+  catch(err){$('#aErr').textContent=err.message||'連線失敗，請稍後再試'}$('#aBtn').disabled=false};
+$('#logout').onclick=()=>{sock&&sock.emit('logout');try{localStorage.removeItem('nn-token')}catch(e){}location.reload()};
+
+// ---------- socket ----------
+function connect(){
+  sock=io({auth:{token}});
+  sock.on('connect',()=>{$('#v-auth').hidden=true;$('#app').hidden=false;$('#meBox').hidden=false;$('#conn').hidden=true;if(table&&view==='table')sock.emit('join',{tid:table.id})});
+  sock.on('connect_error',e=>{if(e.message==='auth'){sock.close();try{localStorage.removeItem('nn-token')}catch(x){}$('#app').hidden=true;$('#meBox').hidden=true;$('#v-auth').hidden=false;$('#aErr').textContent='請重新登入'}else $('#conn').hidden=false});
+  sock.on('disconnect',()=>$('#conn').hidden=false);
+  sock.on('me',d=>{if(!d)return;me=d;renderMe();renderChips();renderTable()});
+  sock.on('lobby',d=>{lobby=d;renderLobby();renderAdmin()});
+  sock.on('table',d=>{if(view!=='table'||(table&&d.id!==table.id&&table.id))return;table=d;skew=Date.now()-d.now;renderTable()});
+  sock.on('hand',d=>{hand=d;renderTable()});
+  sock.on('admin',d=>{adm=d;renderAdmin();renderMe()});
+  sock.on('toast',toast);
+  sock.on('kicked',()=>{toast('這張牌桌已被管理員刪除');table=null;show('lobby')});
+}
+if(token)connect();
+
+// ---------- render ----------
+function renderMe(){if(!me)return;$('#meName').textContent=me.name;$('#meBal').textContent=fmt(me.bal);$('#chipBig').textContent=fmt(me.bal);
+  $('#meRole').textContent=me.admin?'管理員':'玩家';$('#meRole').className='role'+(me.admin?' admin':'');$('#adminNav').hidden=!me.admin;
+  const n=adm?adm.requests.length:0;$('#pend').textContent=n?`(${n})`:''}
+function renderLobby(){$('#tables').innerHTML=lobby.length?lobby.map(t=>`<div class="tcard"><h3>${esc(t.name)}</h3><div class="sub">底注 ${fmt(t.base)} · ${t.players}/6 人 · ${PH[t.phase]||''}</div><button class="btn pri" data-join="${esc(t.id)}">進入牌桌</button></div>`).join(''):'<div class="empty-msg">目前沒有牌桌，請管理員到後台新增。</div>'}
+function cardHTML(c,f){if(!c)return '<div class="card back"></div>';return `<div class="card${c.s===0||c.s===2?' red':''}${f?' flip':''}"><span class="r">${RK[c.r]}</span><span class="s">${SU[c.s]}</span></div>`}
+function renderTable(){
+  if(!table||view!=='table')return;const t=table,uid=me&&me.id;
+  $('#phase').textContent=t.phase==='idle'&&t.deadline?'即將開局':(PH[t.phase]||'');
+  let sub=`${t.name} · 底注 ${fmt(t.base)} · 第 ${t.round} 局`;const bk=t.seats.find(s=>s.uid===t.banker);if(bk)sub+=` · 莊家：${bk.name}${t.grabMult>1?'（搶 '+t.grabMult+' 倍）':''}`;$('#phaseSub').textContent=sub;
+  const seats=[...t.seats].sort((a,b)=>(b.uid===uid)-(a.uid===uid)),res={};(t.results||[]).forEach(r=>res[r.uid]=r);
+  let h=seats.map(s=>{const r=t.phase==='done'?res[s.uid]:null,mine=s.uid===uid,isB=t.banker===s.uid;let cards='';
+    if(r){const tri=r.tri||[],a=tri.map(i=>r.cards[i]),b=r.cards.filter((_,i)=>!tri.includes(i));cards=(tri.length?a.map(c=>cardHTML(c,1)).join('')+'<span class="gap"></span>':'')+b.map(c=>cardHTML(c,1)).join('')}
+    else if(t.phase==='grab'||t.phase==='bet'){const mc=mine&&hand&&hand.tid===t.id&&hand.round===t.round?hand.cards:[];cards=[0,1,2,3,4].map(i=>cardHTML(mc[i])).join('')}
+    let st='';if(t.phase==='grab')st=s.grab==null?'考慮中…':s.grab?'搶 '+s.grab+' 倍':'不搶';else if(t.phase==='bet')st=isB?'莊家':s.bet==null?'下注中…':'押 '+s.bet+' 倍';else if(r&&!isB)st='押 '+r.bet+' 倍';
+    return `<div class="seat${mine?' mine':''}${s.online?'':' off'}"><div class="top"><span class="nm">${esc(mine?s.name+'（你）':s.name)}</span><span class="row">${isB?'<span class="tag bk">莊</span>':''}${s.online?'':'<span class="tag">離線</span>'}${s.leave?'<span class="tag">離座中</span>':''}</span></div>
+      <div class="sb"><span>籌碼 <b>${fmt(s.bal)}</b></span><span>${esc(st)}</span></div><div class="hand">${cards}</div>
+      ${r?`<div class="res"><span class="hn">${esc(r.hand)}${r.mult>1?' ×'+r.mult:''}</span><span class="dl ${r.delta>0?'p':r.delta<0?'n':''}">${r.delta>0?'+':''}${fmt(r.delta)}</span></div>`:''}</div>`}).join('');
+  for(let i=seats.length;i<6;i++)h+='<div class="seat empty">空位</div>';$('#seats').innerHTML=h;
+  const my=t.seats.find(s=>s.uid===uid),open=t.phase==='idle'||t.phase==='done',bal=me?me.bal:0;let a='';
+  if(!my)a=open?`<button class="btn pri" data-a="sit" ${t.seats.length>=6||bal<t.base?'disabled':''}>入座</button><span class="lab">${bal<t.base?'籌碼不足，請到「我的籌碼」申請':'兩人以上入座就會自動開局'}</span>`:'<span class="lab">本局進行中，下一局才能入座</span>';
+  else if(t.phase==='grab'&&my.grab==null)a='<span class="lab">看完 4 張牌，要搶莊嗎？</span>'+[0,1,2,3,4].map(v=>`<button class="btn${v?' pri':''}" data-a="grab" data-x="${v}">${v?'搶 '+v+' 倍':'不搶'}</button>`).join('');
+  else if(t.phase==='bet'&&t.banker!==uid&&my.bet==null)a='<span class="lab">選擇下注倍數</span>'+[1,2,3,5].map(v=>`<button class="btn pri" data-a="bet" data-x="${v}">${v} 倍</button>`).join('');
+  else if(open)a='<button class="btn" data-a="stand">離座</button><span class="lab">等待其他玩家</span>';
+  else a=`<span class="lab">等待其他玩家…</span>${my.leave?'':'<button class="btn sm" data-a="stand">本局結束後離座</button>'}`;
+  $('#acts').innerHTML=a}
+function tickTimer(){const t=table;if(!t||view!=='table'||!t.deadline){$('#timer').textContent='';return}$('#timer').textContent=Math.max(0,Math.ceil((t.deadline-(Date.now()-skew))/1000))+'s'}
+setInterval(tickTimer,300);
+function renderChips(){if(!me)return;
+  $('#myReqs').innerHTML=me.requests.length?`<table><thead><tr><th>時間</th><th class="num">數量</th><th>狀態</th></tr></thead><tbody>${me.requests.map(r=>`<tr><td>${new Date(r.at).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</td><td class="num">${fmt(r.amount)}</td><td><span class="st ${esc(r.status)}">${{pending:'審核中',approved:'已核准',rejected:'未核准'}[r.status]||''}</span></td></tr>`).join('')}</tbody></table>`:'<div class="empty-msg">還沒有申請紀錄。</div>';
+  $('#myHist').innerHTML=me.history.length?`<table><thead><tr><th>牌桌</th><th>莊家</th><th>牌型</th><th class="num">輸贏</th></tr></thead><tbody>${me.history.map(x=>`<tr><td>${esc(x.table)} #${x.round}</td><td>${esc(x.banker)}</td><td>${esc(x.hand)}</td><td class="num ${x.delta>0?'p':x.delta<0?'n':''}">${x.delta>0?'+':''}${fmt(x.delta)}</td></tr>`).join('')}</tbody></table>`:'<div class="empty-msg">還沒打過牌局。</div>'}
+function renderAdmin(){if(!adm||!me||!me.admin)return;
+  $('#aReqs').innerHTML=adm.requests.length?`<table class="stack"><thead><tr><th>玩家</th><th class="num">數量</th><th>留言</th><th>處理</th></tr></thead><tbody>${adm.requests.map(r=>`<tr><td>${esc(r.name)}</td><td class="num">${fmt(r.amount)}</td><td>${esc(r.note)}</td><td><div class="row"><button class="btn sm pri" data-ap="${esc(r.id)}">核准</button><button class="btn sm red" data-rj="${esc(r.id)}">拒絕</button></div></td></tr>`).join('')}</tbody></table>`:'<div class="empty-msg">目前沒有待審核的申請。</div>';
+  $('#aTables').innerHTML=lobby.length?`<table class="stack"><thead><tr><th>名稱</th><th>人數</th><th>底注</th><th></th></tr></thead><tbody>${lobby.map(t=>`<tr><td>${esc(t.name)}</td><td>${t.players}/6</td><td><select data-base="${esc(t.id)}" aria-label="底注">${BASES.map(b=>`<option ${b===t.base?'selected':''}>${b}</option>`).join('')}</select></td><td><button class="btn sm red" data-del="${esc(t.id)}">刪除</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty-msg">還沒有牌桌。</div>';
+  $('#aUsers').innerHTML=`<table class="stack"><thead><tr><th>玩家</th><th class="num">餘額</th><th>調整籌碼</th><th>其他</th></tr></thead><tbody>${adm.users.map(u=>`<tr><td>${esc(u.name)}${u.admin?' <span class="tag bk">管理員</span>':''}${u.online?' <span class="tag">在線</span>':''}</td><td class="num">${fmt(u.bal)}</td><td><div class="row"><input type="number" step="10" placeholder="±數量" style="width:7em" id="adj-${esc(u.id)}" aria-label="調整數量"><button class="btn sm" data-adj="${esc(u.id)}">套用</button></div></td><td><div class="row"><button class="btn sm" data-pw="${esc(u.id)}">重設密碼</button>${u.id===me.id?'':`<button class="btn sm" data-adm="${esc(u.id)}" data-on="${u.admin?0:1}">${u.admin?'取消管理員':'設為管理員'}</button>`}</div></td></tr>`).join('')}</tbody></table>`;
+  $('#aLedger').innerHTML=adm.ledger.length?`<table><thead><tr><th>時間</th><th>玩家</th><th>原因</th><th>經手</th><th class="num">變動</th></tr></thead><tbody>${adm.ledger.map(l=>`<tr><td>${new Date(l.at).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</td><td>${esc(l.name)}</td><td>${esc(l.reason)}</td><td>${esc(l.byName)}</td><td class="num">${l.delta>0?'+':''}${fmt(l.delta)}</td></tr>`).join('')}</tbody></table>`:'<div class="empty-msg">尚無紀錄。</div>'}
+
+// ---------- events ----------
+document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!sock)return;const d=b.dataset;
+  if(d.v){if(d.v!=='table'&&table){sock.emit('exit');table=null}show(d.v);renderChips();renderAdmin();return}
+  if(d.join){table={id:d.join};hand=null;show('table');sock.emit('join',{tid:d.join});return}
+  if(b.id==='back'){sock.emit('exit');table=null;show('lobby');return}
+  if(d.a){sock.emit(d.a,{v:d.x!=null?+d.x:undefined});return}
+  if(d.ap){sock.emit('approve',{rid:d.ap});return}
+  if(d.rj){sock.emit('reject',{rid:d.rj});return}
+  if(d.adj){const i=document.getElementById('adj-'+d.adj),v=Math.round(Number(i&&i.value));if(!v)return;sock.emit('adjust',{target:d.adj,delta:v});i.value='';return}
+  if(d.del){if(b.dataset.sure){sock.emit('deleteTable',{tid:d.del});return}b.dataset.sure=1;b.textContent='再按一次確認';setTimeout(()=>{b.dataset.sure='';b.textContent='刪除'},3000);return}
+  if(d.adm){sock.emit('setAdmin',{target:d.adm,on:d.on==='1'});return}
+  if(d.pw){const cell=b.parentElement;cell.innerHTML=`<input type="text" placeholder="新密碼" style="width:8em" aria-label="新密碼"><button class="btn sm pri" data-pwgo="${esc(d.pw)}">確定</button>`;return}
+  if(d.pwgo){const i=b.previousElementSibling;sock.emit('resetPass',{target:d.pwgo,pass:i.value});return}
+});
+document.addEventListener('change',e=>{if(e.target.dataset.base&&sock)sock.emit('editTable',{tid:e.target.dataset.base,base:+e.target.value})});
+$('#reqForm').onsubmit=e=>{e.preventDefault();sock&&sock.emit('request',{amount:+$('#reqAmt').value,note:$('#reqNote').value});$('#reqNote').value=''};
+$('#newTable').onsubmit=e=>{e.preventDefault();sock&&sock.emit('createTable',{name:$('#ntName').value,base:+$('#ntBase').value});$('#ntName').value=''};
+}
+</script>
+</body>
+</html>

@@ -176,11 +176,11 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:now
 .tile .cf svg{filter:url(#eng)}
 /* 立體掀牌 */
 .tw.tt .p0 .scards{order:-1}
-.pz{--W:66px;--H:calc(var(--W)*1.34);--D:calc(var(--W)*.62);display:flex;gap:calc(var(--W)*.42);justify-content:center;align-items:flex-end;padding-top:calc(var(--H)*.95)}
+.pz{--W:66px;--H:calc(var(--W)*1.34);--D:calc(var(--W)*.62);display:flex;gap:calc(var(--W)*.42);justify-content:center;align-items:flex-end;padding-top:calc(var(--H)*.4)}
 .slot{perspective:620px;perspective-origin:50% -40%}
 .pl3{--a:0;position:relative;width:var(--W);height:var(--H);transform-style:preserve-3d;transform:rotateX(34deg)}
-.sh3{position:absolute;left:-14%;right:-14%;top:20%;bottom:-18%;border-radius:50%;background:radial-gradient(closest-side,#000d,#0000);opacity:calc(var(--a)/130 + .25);transform:translateZ(.5px) scaleY(calc(.6 + var(--a)/220));transition:opacity .45s,transform .45s}
-.mj3{position:absolute;inset:0;transform-style:preserve-3d;transform-origin:50% 0 0;transform:translateY(calc(var(--H) * var(--a) / 100 * .92)) rotateX(calc(var(--a)*1deg));transition:transform .5s cubic-bezier(.22,.9,.3,1.12);cursor:grab;touch-action:none;outline:none}
+.sh3{position:absolute;left:-14%;right:-14%;top:20%;bottom:-18%;border-radius:50%;background:radial-gradient(closest-side,#000d,#0000);opacity:calc(.3 + .5 * clamp(0, var(--a) / 90, 1) - .5 * clamp(0, (var(--a) - 90) / 90, 1));transform:translateZ(.5px) scaleY(calc(.7 + .4 * clamp(0, var(--a) / 90, 1)));transition:opacity .6s,transform .6s}
+.mj3{position:absolute;inset:0;transform-style:preserve-3d;transform-origin:50% 0 0;transform:translateY(calc(var(--H) * (.92 * clamp(0, var(--a) / 100, 1) + .08 * clamp(0, (var(--a) - 100) / 80, 1)))) translateZ(calc(var(--D) * clamp(0, (var(--a) - 100) / 80, 1))) rotateX(calc(var(--a)*1deg));transition:transform .75s cubic-bezier(.3,.75,.35,1.08);cursor:grab;touch-action:none;outline:none}
 .mj3.drag,.mj3.drag~.sh3,.pl3.drag .sh3{transition:none}
 .mj3.opened{cursor:default}
 .mj3 .f{position:absolute}
@@ -551,7 +551,7 @@ function tileSVG(v){if(TCACHE.has(v))return TCACHE.get(v);let b='';
     b=`<circle cx="30" cy="40" r="26.5" fill="none" stroke="${TC.G}" stroke-width="1.6"/>${pet}<circle cx="30" cy="40" r="18" fill="none" stroke="${TC.B}" stroke-width="3"/>${dot(30,40,14.5,'R')}`}
   else b=TLAY[v].map(([x,y,r,c])=>dot(x,y,r,c)).join('');
   const svg=`<svg viewBox="0 0 60 80" aria-label="${v===0?'白板':v+'筒'}"><rect x="2.5" y="2.5" width="55" height="75" rx="6" fill="none" stroke="#d8caa3" stroke-width=".7" opacity=".8"/>${b}</svg>`;TCACHE.set(v,svg);return svg}
-function mj3Tile(v,k,isOpen,deal,d){return `<div class="slot${deal?' deal':''}" style="--d:${d||0}ms"><div class="pl3" style="--a:${isOpen?100:0}"><div class="sh3"></div><div class="mj3${isOpen?' opened':''}" data-k="${k}" tabindex="0" role="button" aria-label="掀開第 ${k+1} 張牌"><div class="f sn"></div><div class="f sw"></div><div class="f se"></div><div class="f bot">${tileSVG(v)}</div><div class="f ss"></div><div class="f top"></div></div></div></div>`}
+function mj3Tile(v,k,isOpen,deal,d){return `<div class="slot${deal?' deal':''}" style="--d:${d||0}ms"><div class="pl3" style="--a:${isOpen?180:0}"><div class="sh3"></div><div class="mj3${isOpen?' opened':''}" data-k="${k}" tabindex="0" role="button" aria-label="掀開第 ${k+1} 張牌"><div class="f sn"></div><div class="f sw"></div><div class="f se"></div><div class="f bot">${tileSVG(v)}</div><div class="f ss"></div><div class="f top"></div></div></div></div>`}
 function mjTile(v,k,opened,deal,d){return `<div class="card tile mj${opened?' opened':''}${deal?' deal':''}" data-k="${k}" tabindex="0" role="button" aria-label="掀開第 ${k+1} 張牌" style="--d:${d||0}ms;--lift:${opened?1:0}"><div class="ci"><div class="cf">${tileSVG(v)}</div><div class="shade"></div></div><div class="lid"><div class="lf"></div><div class="lb"></div></div></div>`}
 function tile(v,cls,d,f){return `<div class="card tile${cls}" style="--d:${d||0}ms;--f:${f||0}ms"><div class="ci"><div class="cback"></div>${v!=null?`<div class="cf">${tileSVG(v)}</div>`:''}</div></div>`}
 const DIEP={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
@@ -594,7 +594,7 @@ function renderTT(){
       part(el,'.scards',ch,'p'+t.round+':'+s.uid+(myT?'m':''));part(el,'.sres','')}
     else if(r){const mineOpen=mine&&opened.round===t.round&&opened.ks.size===2;
       const ch=mine?`<div class="pz">${r.tiles.map((v,k)=>mj3Tile(v,k,opened.round===t.round&&opened.ks.has(k),false,0)).join('')}</div>`:r.tiles.map((v,k)=>tile(v,' up'+(an?' flip':''),0,200+i*240+k*90)).join('');
-      if(mine)setTimeout(()=>document.querySelectorAll('.p0 .mj3:not(.opened)').forEach((m,k)=>setTimeout(()=>{m.classList.add('opened');m.parentElement.style.setProperty('--a','100')},k*220)),60);
+      if(mine)setTimeout(()=>document.querySelectorAll('.p0 .mj3:not(.opened)').forEach((m,k)=>setTimeout(()=>{m.classList.add('opened');m.parentElement.style.setProperty('--a','180')},k*220)),60);
       part(el,'.scards',ch,'t'+t.round+':'+s.uid);
       const cls=r.hand==='白板對'?'n4':r.pair?'n3':r.hand.startsWith('九點')?'n2':r.bie?'n0':'n1';
       part(el,'.sres',`<span class="hb ${cls}" style="--d:${1.1+i*.22}s">${esc(r.hand)}${r.mult>1?' ×'+r.mult:''}</span><span class="dl ${r.delta>0?'p':r.delta<0?'n':''}" style="--d2:3.4s">${r.delta>0?'+':''}${fmt(r.delta)}</span>`)}
@@ -613,7 +613,7 @@ function renderTT(){
   else if(t.phase==='tbet'&&t.banker!==uid&&my.bet==null){const hi=Math.max(Math.min(t.maxBet,bal),Math.min(t.base,bal)),lo=Math.min(t.base,bal),v=Math.min(hi,Math.max(lo,t.base*2));
     a=`<div class="betbox"><span class="lab">下注</span><button class="btn sm" data-bq="${lo}">最低</button><input type="range" id="betR" min="${lo}" max="${hi}" step="${t.base}" value="${v}" aria-label="下注金額"><button class="btn sm" data-bq="${hi}">最高</button><span class="betv" id="betV">${fmt(v)}</span><button class="btn pri" data-tbgo="1">確定下注</button></div>`}
   else if(t.phase==='tbet')a=`<span class="lab">${t.banker===uid?'你是莊家，等待閒家下注…':'已下注，等待其他玩家…'}</span>${standBtn('本把結束後離座',1)}`;
-  else if(t.phase==='peek'){const mo=my.open||opened.ks.size>=2;a=mo?`<span class="lab">已看牌，等待其他玩家掀牌…</span>${standBtn('本把結束後離座',1)}`:`<span class="lab">手指按住牌往上推，把牌撬起來看；推過一半放開，牌就會立起來</span><button class="btn pri" data-openall="1">直接開牌</button>`}
+  else if(t.phase==='peek'){const mo=my.open||opened.ks.size>=2;a=mo?`<span class="lab">已看牌，等待其他玩家掀牌…</span>${standBtn('本把結束後離座',1)}`:`<span class="lab">手指按住牌往上推，把牌撬起來看；推過一半放開，牌就會翻開平躺</span><button class="btn pri" data-openall="1">直接開牌</button>`}
   else if(t.phase==='done')a=inSeries&&t.seriesNo<t.seriesTotal?`<span class="lab">下一把（${t.seriesNo+1}/${t.seriesTotal}）即將開始，莊家換下一位</span>${standBtn('離座')}`:'<span class="lab">本輪結束，稍後回到準備階段</span>';
   if($('#acts')._h!==a){$('#acts').innerHTML=a;$('#acts')._h=a}
 }
@@ -628,7 +628,7 @@ function runFxTT(t,order){
 }
 
 // ---------- 掀牌互動（立體） ----------
-function openTile(m){if(!m||m.classList.contains('opened'))return;const pl=m.parentElement,k=+m.dataset.k;m.classList.remove('drag');pl.classList.remove('drag');pl.style.setProperty('--a','100');m.classList.add('opened');try{navigator.vibrate&&navigator.vibrate(12)}catch(x){}
+function openTile(m){if(!m||m.classList.contains('opened'))return;const pl=m.parentElement,k=+m.dataset.k;m.classList.remove('drag');pl.classList.remove('drag');pl.style.setProperty('--a','180');m.classList.add('opened');try{navigator.vibrate&&navigator.vibrate(12)}catch(x){}
   opened.ks.add(k);if(opened.ks.size>=2&&sock&&table&&table.phase==='peek'){sock.emit('open');setTimeout(()=>{$('#acts')._h=null;renderTable()},500)}}
 let drag=null;
 document.addEventListener('pointerdown',e=>{const m=e.target.closest('.mj3');if(!m||m.classList.contains('opened'))return;e.preventDefault();

@@ -168,6 +168,28 @@ function grant(uid, delta, reason, by) {
 }
 function refreshSeated(uid) { for (const tid in G) if (G[tid].seats.some(s => s.uid === uid)) pushTable(tid); }
 
+// ---------------- 中途離座罰金 ----------------
+const PENALTY_X = 5; // 罰金 = 底注 × 5，付給其他每位玩家
+const seriesActive = (tid, g) => g.seriesNo > 0 && !(g.phase === 'done' && g.seriesNo >= (g.seriesLen || seriesOf(tid)));
+function penalize(tid, uid, why) {
+  const t = S.tables[tid], g = rt(tid), u = S.users[uid]; if (!t || !u) return;
+  const others = g.seats.filter(s => s.uid !== uid && !s.leave && S.users[s.uid]);
+  if (!others.length) return;
+  let each = t.base * PENALTY_X;
+  if (u.bal < each * others.length) each = Math.floor(u.bal / others.length);
+  if (each <= 0) return;
+  const now = Date.now();
+  u.bal -= each * others.length;
+  S.ledger.unshift({ id: newId(), uid, delta: -each * others.length, reason: why, by: uid, at: now });
+  for (const s of others) {
+    S.users[s.uid].bal += each;
+    S.ledger.unshift({ id: newId(), uid: s.uid, delta: each, reason: '收到 ' + u.name + ' 的離座罰金', by: uid, at: now });
+    pushMe(s.uid);
+  }
+  S.ledger = S.ledger.slice(0, 500); save(); pushMe(uid); pushAdmin();
+  io.to('t:' + tid).emit('toast', `${u.name} ${why.includes('斷線') ? '中途斷線' : '中途離座'}，付給每位玩家 ${each.toLocaleString()} 籌碼罰金`);
+}
+
 // ---------------- 遊戲流程 ----------------
 function startRound(tid) {
   const t = S.tables[tid], g = rt(tid);
@@ -215,6 +237,11 @@ setInterval(() => {
     if (g.phase === 'grab' && (g.seats.every(s => s.grab != null) || now > g.deadline)) resolveBanker(tid);
     else if (g.phase === 'bet' && (g.seats.every(s => s.uid === g.banker || s.bet != null) || now > g.deadline)) showdown(tid);
     else if (g.phase === 'done' && now > g.deadline) {
+      if ((g.seriesNo || 0) < (g.seriesLen || seriesOf(tid))) {
+        const gone = g.seats.filter(s => !s.leave && !online(s.uid));
+        gone.forEach(s => { s.leave = true; });
+        gone.forEach(s => penalize(tid, s.uid, '中途斷線罰金'));
+      }
       g.seats = g.seats.filter(s => !s.leave && online(s.uid));
       if ((g.seriesNo || 0) < (g.seriesLen || seriesOf(tid)) && g.seats.length >= 2) { g.seriesNo++; startRound(tid); }
       else {
@@ -266,7 +293,8 @@ io.on('connection', socket => {
     g.seats.push({ uid, grab: null, bet: null, ready: false }); pushTable(cur); pushLobby();
   });
   socket.on('stand', () => {
-    if (!cur) return; const g = rt(cur), s = g.seats.find(x => x.uid === uid); if (!s) return;
+    if (!cur) return; const g = rt(cur), s = g.seats.find(x => x.uid === uid); if (!s || s.leave) return;
+    if (seriesActive(cur, g)) { s.leave = true; penalize(cur, uid, '中途離座罰金'); }
     if (g.phase === 'idle' || g.phase === 'done') g.seats = g.seats.filter(x => x.uid !== uid); else s.leave = true;
     pushTable(cur); pushLobby();
   });

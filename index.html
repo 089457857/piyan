@@ -162,6 +162,23 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:now
 .pl{left:12%;top:47%}.pr{left:88%;top:47%}
 .tw.tt .oval::after{content:"推筒子"}
 .gtag{font-size:12px;padding:2px 9px;border-radius:99px;font-weight:700;white-space:nowrap}
+.gtag.he{background:#1c2f5e;color:#cfe0ff;border:1px solid #3d5fa8}
+.tw.he .oval::after{content:"德州撲克";top:74%;letter-spacing:.2em}
+.board{display:flex;gap:5px;justify-content:center;min-height:58px;perspective:600px}.board .card{--w:42px}.board .card+.card{margin-left:0}
+.board .slot0{width:42px;height:59px;border-radius:5px;border:1.5px dashed #e7c46a40;flex:none}
+.pot{font:900 15px "Noto Sans TC";color:var(--gold);background:#000a;border:1px solid var(--gold2);border-radius:99px;padding:2px 12px;display:flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums}
+.pot svg{width:16px;height:16px}
+.betchip{display:inline-flex;align-items:center;gap:4px;font:700 13px "Noto Sans TC";color:#fff;background:#000b;border:1px solid #ffffff30;border-radius:99px;padding:1px 9px 1px 3px;font-variant-numeric:tabular-nums}
+.betchip svg{width:16px;height:16px}
+.seat.turn .sinfo{border-color:#7fe0b0;box-shadow:0 0 0 2px #7fe0b0,0 0 18px #7fe0b088;animation:turnp 1s ease-in-out infinite}
+@keyframes turnp{50%{box-shadow:0 0 0 2px #7fe0b0,0 0 4px #7fe0b044}}
+.seat.fold .scards{opacity:.35;filter:grayscale(1)}
+.tag.dbtn{background:#fff;color:#111;font-weight:900;border-color:#fff}.tag.blind{background:#1c2f5e;border-color:#3d5fa8}
+.tag.act{background:#123d2c;border-color:#2e7a57}.tag.ai{background:#6e1423;border-color:#c41e2e;font-weight:700}
+.card.win .cf{box-shadow:0 0 0 2px var(--gold),0 0 12px #e7c46acc}
+.hebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center}
+.hebar input[type=range]{width:min(240px,55vw);accent-color:var(--gold);min-height:0}
+@media(max-width:640px){.board .card{--w:30px}.board .slot0{width:30px;height:42px}.board{min-height:42px;gap:3px}.pot{font-size:12px}.tw.he .center{width:60%}}
 .gtag.nn{background:#6e1423;color:#ffe3b0;border:1px solid #b53a49}.gtag.tt{background:#123d2c;color:#bff5d9;border:1px solid #2e7a57}
 .card.tile{height:calc(var(--w)*1.32)}
 .seat .card.tile+.card.tile{margin-left:calc(var(--w)*.12)}
@@ -278,7 +295,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:now
         <circle cx="32" cy="32" r="30" fill="#6e1423" stroke="url(#gg)" stroke-width="3"/>
         <path d="M10 22c4 6 10 8 15 7l-2 4c-1 6 3 14 9 17 6-3 10-11 9-17l-2-4c5 1 11-1 15-7-3 9-9 13-15 13 0 9-3 16-7 19-4-3-7-10-7-19-6 0-12-4-15-13z" fill="url(#gg)"/>
         <circle cx="27" cy="38" r="2" fill="#6e1423"/><circle cx="37" cy="38" r="2" fill="#6e1423"/></svg>
-      <div><h1>哪有小孩天天輸</h1><small>牛牛 · 推筒子 · 線上連線 · 虛擬籌碼</small></div>
+      <div><h1>哪有小孩天天輸</h1><small>牛牛 · 推筒子 · 德州撲克 · 線上連線 · 虛擬籌碼</small></div>
     </div>
     <div class="me" id="meBox" hidden><svg class="chipico"><use href="#chip"/></svg><div><div class="rsub" id="meName"></div><div class="bal" id="meBal">0</div></div><span class="role" id="meRole">玩家</span><button class="btn sm" id="logout">登出</button></div>
   </header>
@@ -326,6 +343,8 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:now
             <div class="deck" id="deck" hidden><i></i><i></i><i></i></div>
             <div class="dice" id="dice" hidden></div>
             <div class="wallv" id="wallv" hidden></div>
+            <div class="pot" id="pot" hidden></div>
+            <div class="board" id="board" hidden></div>
             <div class="csub" id="csub"></div>
           </div>
         </div>
@@ -354,7 +373,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:now
       <div class="grid2">
         <div class="box"><h2>待審核申請</h2><div id="aReqs"></div></div>
         <div class="box"><h2>牌桌</h2><div id="aTables"></div>
-          <form id="newTable" class="row" style="margin-top:12px;display:flex"><input id="ntName" placeholder="牌桌名稱" maxlength="16" style="flex:1" aria-label="牌桌名稱"><select id="ntGame" aria-label="遊戲"><option value="niuniu">牛牛</option><option value="tuitong">推筒子</option></select><select id="ntBase" aria-label="底注"></select><button class="btn pri" type="submit">新增</button></form>
+          <form id="newTable" class="row" style="margin-top:12px;display:flex"><input id="ntName" placeholder="牌桌名稱" maxlength="16" style="flex:1" aria-label="牌桌名稱"><select id="ntGame" aria-label="遊戲"><option value="niuniu">牛牛</option><option value="tuitong">推筒子</option><option value="holdem">德州撲克</option></select><select id="ntBase" aria-label="底注"></select><button class="btn pri" type="submit">新增</button></form>
         </div>
       </div>
       <div class="box" style="margin-top:16px"><h2>玩家</h2><div id="aUsers"></div></div>
@@ -376,7 +395,7 @@ const AVC=[['#b3263a','#5e0f1c'],['#2b7a5e','#0f3d2e'],['#2f5fa8','#132b52'],['#
 const RM=matchMedia('(prefers-reduced-motion: reduce)');
 let token=null;try{token=localStorage.getItem('nn-token')}catch(e){}
 let sock=null,me=null,lobby=[],table=null,hand=null,adm=null,view='lobby',skew=0,regMode=false,toastT=0;
-let seatEls=[],fxRound=-1,dealRound=-1,thand=null,opened={round:-1,ks:new Set()};
+let seatEls=[],fxRound=-1,dealRound=-1,thand=null,opened={round:-1,ks:new Set()},hhole=null,boardSeen={round:-1,n:0};
 
 function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600)}
 function show(v){view=v;for(const k of ['lobby','table','chips','admin'])$('#v-'+k).hidden=k!==v;document.querySelectorAll('nav .btn').forEach(b=>b.classList.toggle('on',b.dataset.v===v||(v==='table'&&b.dataset.v==='lobby')))}
@@ -405,6 +424,7 @@ function connect(){
   sock.on('table',d=>{if(view!=='table'||(table&&table.id&&d.id!==table.id))return;table=d;skew=Date.now()-d.now;renderTable()});
   sock.on('hand',d=>{hand=d;renderTable()});
   sock.on('thand',d=>{thand=d;renderTable()});
+  sock.on('hhole',d=>{hhole=d;renderTable()});
   sock.on('admin',d=>{adm=d;renderAdmin();renderMe()});
   sock.on('toast',toast);
   sock.on('kicked',()=>{toast('這張牌桌已被管理員刪除');table=null;show('lobby')});
@@ -416,9 +436,9 @@ function renderMe(){if(!me)return;$('#meName').textContent=me.name;$('#meBal').t
   $('#meRole').textContent=me.admin?'管理員':'玩家';$('#meRole').className='role'+(me.admin?' admin':'');$('#adminNav').hidden=!me.admin;
   const n=adm?adm.requests.length:0;$('#pend').textContent=n?`(${n})`:''}
 const DOTS=[[50,96],[8,72],[8,28],[50,4],[92,28],[92,72]],DOTS4=[[50,96],[5,50],[50,4],[95,50]];
-const GNAME={niuniu:'牛牛',tuitong:'推筒子'};
-function renderLobby(){$('#tables').innerHTML=lobby.length?lobby.map(t=>`<div class="tcard"><div class="row" style="justify-content:space-between"><span class="gtag ${t.game==='tuitong'?'tt':'nn'}">${GNAME[t.game]||'牛牛'}</span><span class="sub">${t.players}/${t.maxSeats||6} 人</span></div><div class="mini"><div class="dots">${(t.game==='tuitong'?DOTS4:DOTS).map((p,i)=>`<i class="${i<t.players?'on':''}" style="left:${p[0]}%;top:${p[1]}%"></i>`).join('')}</div><b>${esc(t.name)}</b></div>
-  <div class="row" style="justify-content:space-between"><span class="sub">${t.game==='tuitong'?'最低下注':'底注'} ${fmt(t.base)} · ${t.phase==='idle'?'等待中':'牌局進行中'}</span><button class="btn pri" data-join="${esc(t.id)}">入場</button></div></div>`).join(''):'<div class="empty-msg">目前沒有牌桌，請管理員到後台新增。</div>'}
+const GNAME={niuniu:'牛牛',tuitong:'推筒子',holdem:'德州撲克'};const GCLS={niuniu:'nn',tuitong:'tt',holdem:'he'};
+function renderLobby(){$('#tables').innerHTML=lobby.length?lobby.map(t=>`<div class="tcard"><div class="row" style="justify-content:space-between"><span class="gtag ${GCLS[t.game]||'nn'}">${GNAME[t.game]||'牛牛'}</span><span class="sub">${t.players}/${t.maxSeats||6} 人</span></div><div class="mini"><div class="dots">${(t.game==='tuitong'?DOTS4:DOTS).map((p,i)=>`<i class="${i<t.players?'on':''}" style="left:${p[0]}%;top:${p[1]}%"></i>`).join('')}</div><b>${esc(t.name)}</b></div>
+  <div class="row" style="justify-content:space-between"><span class="sub">${t.game==='holdem'?`盲注 ${fmt(Math.max(1,Math.floor(t.base/2)))}/${fmt(t.base)}`:t.game==='tuitong'?'最低下注 '+fmt(t.base):'底注 '+fmt(t.base)} · ${t.game==='holdem'?(t.players>=2?'牌局進行中，可隨時入座':'等待玩家入座'):t.phase==='idle'?'等待中':'牌局進行中'}</span><button class="btn pri" data-join="${esc(t.id)}">入場</button></div></div>`).join(''):'<div class="empty-msg">目前沒有牌桌，請管理員到後台新增。</div>'}
 
 // ---------- cards ----------
 // 擬真牌面：標準點位排列、四角索引、雙頭人像牌
@@ -470,6 +490,8 @@ function setVec(){const tw=$('#tw').getBoundingClientRect(),cx=tw.left+tw.width/
 function renderTable(){
   if(!table||view!=='table'||!table.seats)return;
   if(table.game==='tuitong')return renderTT();
+  if(table.game==='holdem')return renderHE();
+  $('#tw').classList.remove('he');$('#board').hidden=true;$('#pot').hidden=true;$('#setBtn').hidden=false;
   ensureSeats();$('#tw').classList.remove('tt');$('#dice').hidden=true;$('#wallv').hidden=true;
   commonSettings(table,'搶莊考慮時間','局');$('#rules').textContent=RULES_NN;
   const t=table,uid=me&&me.id,isOwner=t.owner===uid,inSeries=t.seriesNo>0,own=t.seats.find(s=>s.uid===t.owner);
@@ -560,7 +582,7 @@ function die(v,roll,dl){return `<div class="die${v===1||v===4?' red':''}${roll?'
 // ---------- 推筒子：牌桌 ----------
 const POS_TT=['p0','pl','p3','pr'];
 function renderTT(){
-  ensureSeats();const t=table,uid=me&&me.id,isOwner=t.owner===uid,inSeries=t.seriesNo>0,own=t.seats.find(s=>s.uid===t.owner);
+  ensureSeats();$('#tw').classList.remove('he');$('#board').hidden=true;$('#pot').hidden=true;$('#setBtn').hidden=false;const t=table,uid=me&&me.id,isOwner=t.owner===uid,inSeries=t.seriesNo>0,own=t.seats.find(s=>s.uid===t.owner);
   $('#tw').classList.add('tt');$('#deck').hidden=true;$('#rules').textContent=RULES_TT;
   commonSettings(t,'下注考慮時間','把');
   $('#rname').textContent=t.name;
@@ -627,6 +649,71 @@ function runFxTT(t,order){
       const n=Math.max(2,Math.min(7,Math.ceil(Math.abs(r.delta)/(t.base*2))));for(let j=0;j<n;j++)fly(from,to,(k++)*45+j*70)}},2500);
 }
 
+// ---------- 德州撲克 ----------
+const RULES_HE='德州撲克：每人 2 張手牌，加上桌面 5 張公牌，取最好的 5 張比大小。皇家同花順 ＞ 同花順 ＞ 四條 ＞ 葫蘆 ＞ 同花 ＞ 順子 ＞ 三條 ＞ 兩對 ＞ 一對 ＞ 高牌。流程：發手牌 → 翻牌前下注 → 翻牌（3 張）→ 轉牌 → 河牌，每一輪都可以過牌、跟注、加注、全下或棄牌。盲注是底注的一半／底注，莊家按鈕每手輪流。隨時可以入座：入座時從餘額買入 20～200 個大盲的桌上籌碼，離座時剩下的籌碼退回餘額，沒有罰金。每次行動有 20 秒，時間到自動過牌或棄牌。';
+const STREET=['翻牌前','翻牌','轉牌','河牌'],LAST={fold:'棄牌',check:'過牌',call:'跟注',raise:'加注',allin:'全下'};
+const chipIco='<svg><use href="#chip"/></svg>';
+function renderHE(){
+  ensureSeats();const t=table,uid=me&&me.id,hs=t.hs||{},[SB,BB]=t.blinds||[5,10];
+  const tw=$('#tw');tw.classList.remove('tt');tw.classList.add('he');$('#deck').hidden=true;$('#dice').hidden=true;$('#wallv').hidden=true;$('#setBtn').hidden=true;$('#setPanel').hidden=true;$('#rules').textContent=RULES_HE;
+  $('#rname').textContent=t.name;$('#rsub').textContent=`德州撲克 · 盲注 ${fmt(SB)}/${fmt(BB)} · 買入 ${fmt(t.buyMin)}～${fmt(t.buyMax)} · 隨時入座、隨時離開`;
+  const playing=t.phase==='hplay',done=t.phase==='hdone',inHand=playing||done;
+  const curS=t.seats.find(s=>s.uid===t.cur);
+  $('#phase').textContent=playing?STREET[t.street]:done?(t.results&&t.results.filter(r=>!r.fold).length>1?'攤牌':'本手結束'):(t.seats.length>=2?'下一手即將開始':'等待玩家入座');
+  $('#csub').textContent=playing?(curS?`輪到 ${curS.name}`:'發牌中…'):done?'':`${t.seats.length}/6 人入座 · 至少 2 人開始`;
+  $('#pot').hidden=!inHand;if(inHand)part($('#pot').parentElement,'#pot',`${chipIco}底池 ${fmt(t.pot)}`);
+  // board
+  const bd=$('#board');bd.hidden=!inHand;
+  if(inHand){if(boardSeen.round!==t.round)boardSeen={round:t.round,n:0};const win=new Set();
+    if(done&&t.results){const w=t.results.filter(r=>r.best&&r.won>0);for(const r of w)for(const c of r.best)win.add(c.r+'-'+c.s)}
+    const h=[0,1,2,3,4].map(k=>{const c=t.board[k];if(!c)return '<div class="slot0"></div>';const fresh=k>=boardSeen.n&&!RM.matches;return card(c,' up'+(fresh?' flip':'')+(win.has(c.r+'-'+c.s)?' win':''),fresh?(k-boardSeen.n)*160:0)}).join('');
+    part(bd.parentElement,'#board',h,'b'+t.round+':'+t.board.length+':'+(done?'d':''));boardSeen.n=t.board.length}
+  // seats
+  const seats=[...t.seats],mi=seats.findIndex(s=>s.uid===uid);const order=mi>0?[...seats.slice(mi),...seats.slice(0,mi)]:seats;if(mi<0)order.unshift(null);
+  const res={};(t.results||[]).forEach(r=>res[r.uid]=r);const isDeal=playing&&dealRound!==t.round;
+  for(let i=0;i<6;i++){
+    const el=seatEls[i],s=order[i];el.hidden=false;
+    if(!s){el.className='seat p'+i;part(el,'.sinfo-w',i===0&&mi<0?'':'<div class="emptyseat">空位</div>');part(el,'.scards','');part(el,'.sres','');continue}
+    const mine=s.uid===uid,h=hs[s.uid],r=done?res[s.uid]:null,turn=playing&&t.cur===s.uid;
+    el.className='seat p'+i+(mine?' mine':'')+(s.online?'':' off')+(turn?' turn':'')+(h&&h.fold?' fold':'');
+    const tags=(t.btn===s.uid&&inHand?'<span class="tag dbtn">D 莊</span>':'')+(playing&&t.sb===s.uid&&t.street===0?'<span class="tag blind">小盲</span>':'')+(playing&&t.bb===s.uid&&t.street===0?'<span class="tag blind">大盲</span>':'')
+      +(h&&h.allin?'<span class="tag ai">全下</span>':h&&h.last&&playing?`<span class="tag act">${LAST[h.last]||''}</span>`:'')+(turn?'<span class="tag st">思考中</span>':'')+(!h&&inHand?'<span class="tag">等下一手</span>':'')+(s.stack<=0&&!h?'<span class="tag">沒有籌碼</span>':'')+(s.online?'':'<span class="tag">離線</span>')+(s.leave?'<span class="tag">離座中</span>':'');
+    part(el,'.sinfo-w',`<div class="sinfo">${avatar(s.name,false)}<div class="who"><span class="nm">${esc(mine?s.name+'（你）':s.name)}</span><span class="cb">${fmt(s.stack)}</span></div></div><div class="tags" style="margin-top:4px">${tags}</div>`);
+    // cards
+    if(h&&!(h.fold&&!mine)){const myC=mine&&hhole&&hhole.tid===t.id&&hhole.round===t.round?hhole.cards:null,showC=r&&r.cards?r.cards:myC;const wset=new Set(r&&r.best&&r.won>0?r.best.map(c=>c.r+'-'+c.s):[]);
+      const dl=isDeal&&!RM.matches;const ch=[0,1].map(k=>{const c=showC?showC[k]:null;return card(c,(c?' up':'')+(dl?' deal':'')+(r&&r.cards&&!mine&&!RM.matches?' flip':'')+(c&&wset.has(c.r+'-'+c.s)?' win':''),dl?(k*order.filter(Boolean).length+i)*90:(r&&r.cards?i*150:0),!mine)}).join('');
+      part(el,'.scards',ch,'h'+t.round+':'+(showC?'c':'b')+(r?'r':'')+(h.fold?'f':''))}
+    else part(el,'.scards','');
+    let sr='';
+    if(r&&(r.cards||r.won>0)){const cls=r.cat>=8?'n4':r.cat>=6?'n3':r.cat>=4?'n2':r.won>0?'n2':'n1';sr=`${r.hand&&r.cards?`<span class="hb ${cls}" style="--d:${.6+i*.15}s">${esc(r.hand)}</span>`:''}<span class="dl ${r.delta>0?'p':r.delta<0?'n':''}" style="--d2:1.6s">${r.delta>0?'+':''}${fmt(r.delta)}</span>`}
+    else if(r&&r.delta)sr=`<span class="dl ${r.delta>0?'p':'n'}" style="--d2:.4s">${r.delta>0?'+':''}${fmt(r.delta)}</span>`;
+    else if(h&&h.bet>0&&playing)sr=`<span class="betchip">${chipIco}${fmt(h.bet)}</span>`;
+    part(el,'.sres',sr);
+  }
+  if(isDeal){setVec();dealRound=t.round}
+  if(done&&t.results&&fxRound!==t.round){fxRound=t.round;runFxHE(t,order)}
+  // actions
+  const my=t.seats.find(s=>s.uid===uid),bal=me?me.bal:0,mh=my&&hs[uid];let a='';
+  if(!my){const mx=Math.min(t.buyMax,bal),def=Math.min(mx,Math.max(t.buyMin,BB*100));
+    a=bal<t.buyMin?`<span class="lab">入座至少需要 ${fmt(t.buyMin)} 籌碼（20 個大盲），請到「我的籌碼」申請</span>`:t.seats.length>=6?'<span class="lab">這桌已經坐滿了</span>':
+      `<div class="hebar"><span class="lab">買入</span><input type="range" id="buyR" min="${t.buyMin}" max="${mx}" step="${BB}" value="${def}" aria-label="買入金額"><span class="betv" id="buyV">${fmt(def)}</span><button class="btn pri" data-hsit="1">入座</button></div>`}
+  else if(playing&&t.cur===uid&&mh){const need=t.curBet-mh.bet,stack=my.stack,minTo=Math.min(t.curBet+t.minRaise,mh.bet+stack),maxTo=mh.bet+stack,canRaise=maxTo>t.curBet;
+    const half=Math.max(minTo,Math.min(maxTo,t.curBet+Math.round(t.pot/2))),full=Math.max(minTo,Math.min(maxTo,t.curBet+t.pot));
+    a=`<div class="hebar"><button class="btn red" data-he="fold">棄牌</button>${need>0?`<button class="btn pri" data-he="call">${need>=stack?'全下跟注 '+fmt(stack):'跟注 '+fmt(need)}</button>`:'<button class="btn pri" data-he="check">過牌</button>'}
+      ${canRaise&&need<stack?`<span class="lab">${t.curBet?'加注到':'下注'}</span><input type="range" id="heR" min="${minTo}" max="${maxTo}" step="${Math.max(1,Math.floor(BB/2))}" value="${minTo}" aria-label="加注金額"><span class="betv" id="heV">${fmt(minTo)}</span><button class="btn sm" data-hq="${half}">½ 池</button><button class="btn sm" data-hq="${full}">1 池</button><button class="btn pri" data-hraise="1">${t.curBet?'加注':'下注'}</button><button class="btn red sm" data-he="allin">全下 ${fmt(stack)}</button>`:''}</div>`}
+  else{const inLive=playing&&mh&&!mh.fold;const room=t.buyMax-my.stack,canTop=!inLive&&room>0&&bal>0;
+    a=`<span class="lab">${playing?(mh?(mh.fold?'你已棄牌，等這一手結束':'等待其他玩家行動…'):'這一手打完就會發牌給你'):done?'下一手即將開始':t.seats.length<2?'等待其他玩家入座':'下一手即將開始'}</span>`+
+      (canTop?`<button class="btn sm" data-htop="${Math.min(room,bal)}">補滿籌碼（+${fmt(Math.min(room,bal))}）</button>`:'')+`<button class="btn sm" data-a="stand">${inLive?'棄牌並離座':'離座（籌碼退回餘額）'}</button>`}
+  if($('#acts')._h!==a){$('#acts').innerHTML=a;$('#acts')._h=a}
+}
+function runFxHE(t,order){
+  if(RM.matches)return;const idx={};order.forEach((s,i)=>{if(s)idx[s.uid]=i});
+  const best=t.results.filter(r=>r.won>0&&r.cards).sort((a,b)=>b.cat-a.cat)[0];
+  if(best&&best.cat>=4)setTimeout(()=>{if(!table||table.round!==t.round)return;const fx=document.createElement('div');fx.className='fx';fx.innerHTML=`<div class="burst"></div><div class="big">${esc(best.hand)}</div><div class="who2">${esc(best.name)}</div>`;$('#tw').appendChild(fx);setTimeout(()=>fx.remove(),1900)},900);
+  setTimeout(()=>{if(!table||table.round!==t.round)return;const tw=$('#tw').getBoundingClientRect(),pr=$('#pot').getBoundingClientRect(),pc=[pr.left+pr.width/2-tw.left,pr.top+pr.height/2-tw.top];let k=0;
+    for(const r of t.results){if(r.won<=0||idx[r.uid]==null)continue;const to=seatCenter(seatEls[idx[r.uid]]);const n=Math.max(3,Math.min(8,Math.ceil(r.won/((t.blinds||[5,10])[1]*4))));for(let j=0;j<n;j++)fly(pc,to,(k++)*40+j*60)}},best?1700:500);
+}
+
 // ---------- 掀牌互動（立體） ----------
 function openTile(m){if(!m||m.classList.contains('opened'))return;const pl=m.parentElement,k=+m.dataset.k;m.classList.remove('drag');pl.classList.remove('drag');pl.style.setProperty('--a','180');m.classList.add('opened');try{navigator.vibrate&&navigator.vibrate(12)}catch(x){}
   opened.ks.add(k);if(opened.ks.size>=2&&sock&&table&&table.phase==='peek'){sock.emit('open');setTimeout(()=>{$('#acts')._h=null;renderTable()},500)}}
@@ -661,7 +748,7 @@ function fly([x1,y1],[x2,y2],delay){const c=document.createElementNS('http://www
 
 // ---------- timer ring ----------
 function tickTimer(){const t=table,ring=$('#ring');if(!t||view!=='table'||!t.deadline||t.phase==='idle'){ring.hidden=true;return}
-  ring.hidden=false;const left=Math.max(0,(t.deadline-(Date.now()-skew))/1000),tot=t.phase==='grab'||t.phase==='tbet'?t.grabSec:t.phase==='bet'?10:t.phase==='peek'?12.6:9;
+  ring.hidden=false;const left=Math.max(0,(t.deadline-(Date.now()-skew))/1000),tot=t.phase==='hplay'?20:t.phase==='hdone'?7:t.phase==='grab'||t.phase==='tbet'?t.grabSec:t.phase==='bet'?10:t.phase==='peek'?12.6:9;
   $('#timer').textContent=Math.ceil(left);const arc=$('#ringArc');arc.style.strokeDashoffset=String(163.4*(1-Math.min(1,left/tot)));arc.style.stroke=left<=3?'#ff6b6b':'#e7c46a'}
 setInterval(tickTimer,200);
 addEventListener('resize',()=>{if(table&&table.phase==='grab')setVec()});
@@ -672,18 +759,23 @@ function renderChips(){if(!me)return;
   $('#myHist').innerHTML=me.history.length?`<table><thead><tr><th>牌桌</th><th>莊家</th><th>牌型</th><th class="num">輸贏</th></tr></thead><tbody>${me.history.map(x=>`<tr><td>${esc(x.table)} #${x.round}</td><td>${esc(x.banker)}</td><td>${esc(x.hand)}</td><td class="num ${x.delta>0?'p':x.delta<0?'n':''}">${x.delta>0?'+':''}${fmt(x.delta)}</td></tr>`).join('')}</tbody></table>`:'<div class="empty-msg">還沒打過牌局。</div>'}
 function renderAdmin(){if(!adm||!me||!me.admin)return;
   $('#aReqs').innerHTML=adm.requests.length?`<table class="stack"><thead><tr><th>玩家</th><th class="num">數量</th><th>留言</th><th>處理</th></tr></thead><tbody>${adm.requests.map(r=>`<tr><td>${esc(r.name)}</td><td class="num">${fmt(r.amount)}</td><td>${esc(r.note)}</td><td><div class="row"><button class="btn sm pri" data-ap="${esc(r.id)}">核准</button><button class="btn sm red" data-rj="${esc(r.id)}">拒絕</button></div></td></tr>`).join('')}</tbody></table>`:'<div class="empty-msg">目前沒有待審核的申請。</div>';
-  $('#aTables').innerHTML=lobby.length?`<table class="stack"><thead><tr><th>名稱</th><th>人數</th><th>底注</th><th></th></tr></thead><tbody>${lobby.map(t=>`<tr><td>${esc(t.name)} <span class="gtag ${t.game==='tuitong'?'tt':'nn'}">${GNAME[t.game]||'牛牛'}</span></td><td>${t.players}/${t.maxSeats||6}</td><td><select data-base="${esc(t.id)}" aria-label="底注">${BASES.map(b=>`<option ${b===t.base?'selected':''}>${b}</option>`).join('')}</select></td><td><button class="btn sm red" data-del="${esc(t.id)}">刪除</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty-msg">還沒有牌桌。</div>';
+  $('#aTables').innerHTML=lobby.length?`<table class="stack"><thead><tr><th>名稱</th><th>人數</th><th>底注</th><th></th></tr></thead><tbody>${lobby.map(t=>`<tr><td>${esc(t.name)} <span class="gtag ${GCLS[t.game]||'nn'}">${GNAME[t.game]||'牛牛'}</span></td><td>${t.players}/${t.maxSeats||6}</td><td><select data-base="${esc(t.id)}" aria-label="底注">${BASES.map(b=>`<option ${b===t.base?'selected':''}>${b}</option>`).join('')}</select></td><td><button class="btn sm red" data-del="${esc(t.id)}">刪除</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty-msg">還沒有牌桌。</div>';
   $('#aUsers').innerHTML=`<table class="stack"><thead><tr><th>玩家</th><th class="num">餘額</th><th>調整籌碼</th><th>其他</th></tr></thead><tbody>${adm.users.map(u=>`<tr><td>${esc(u.name)}${u.admin?' <span class="tagb gold">管理員</span>':''}${u.online?' <span class="tagb">在線</span>':''}</td><td class="num">${fmt(u.bal)}</td><td><div class="row"><input type="number" step="10" placeholder="±數量" style="width:7em" id="adj-${esc(u.id)}" aria-label="調整數量"><button class="btn sm" data-adj="${esc(u.id)}">套用</button></div></td><td><div class="row"><button class="btn sm" data-pw="${esc(u.id)}">重設密碼</button>${u.id===me.id?'':`<button class="btn sm" data-adm="${esc(u.id)}" data-on="${u.admin?0:1}">${u.admin?'取消管理員':'設為管理員'}</button>`}</div></td></tr>`).join('')}</tbody></table>`;
   $('#aLedger').innerHTML=adm.ledger.length?`<table><thead><tr><th>時間</th><th>玩家</th><th>原因</th><th>經手</th><th class="num">變動</th></tr></thead><tbody>${adm.ledger.map(l=>`<tr><td>${new Date(l.at).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</td><td>${esc(l.name)}</td><td>${esc(l.reason)}</td><td>${esc(l.byName)}</td><td class="num">${l.delta>0?'+':''}${fmt(l.delta)}</td></tr>`).join('')}</tbody></table>`:'<div class="empty-msg">尚無紀錄。</div>'}
 
 // ---------- events ----------
 document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!sock)return;const d=b.dataset;
   if(d.v){if(d.v!=='table'&&table){sock.emit('exit');table=null}show(d.v);renderChips();renderAdmin();return}
-  if(d.join){table={id:d.join};hand=null;fxRound=-1;dealRound=-1;show('table');sock.emit('join',{tid:d.join});return}
+  if(d.join){table={id:d.join};hand=null;hhole=null;fxRound=-1;dealRound=-1;show('table');sock.emit('join',{tid:d.join});return}
   if(b.id==='setBtn'){const p=$('#setPanel');p.hidden=!p.hidden;b.setAttribute('aria-expanded',String(!p.hidden));return}
   if(b.id==='back'){sock.emit('exit');table=null;show('lobby');return}
   if(d.a){if(d.confirm&&!d.sure){d.sure='1';b.textContent=`確定離座？共需付 ${fmt(table.base*5*Math.max(0,table.seats.filter(s=>s.uid!==me.id&&!s.leave).length))} 籌碼`;setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;$('#acts')._h=null;renderTable()}},3500);return}
     sock.emit(d.a,{v:d.x!=null?+d.x:undefined});return}
+  if(d.hsit){const r=$('#buyR');sock.emit('sit',{v:r?+r.value:undefined});return}
+  if(d.he){sock.emit('hact',{a:d.he});b.disabled=true;return}
+  if(d.hq){const r=$('#heR');if(r){r.value=d.hq;$('#heV').textContent=fmt(r.value)}return}
+  if(d.hraise){const r=$('#heR');if(r){sock.emit('hact',{a:'raise',v:+r.value});b.disabled=true}return}
+  if(d.htop){sock.emit('hbuy',{v:+d.htop});return}
   if(d.openall){document.querySelectorAll('.mj3:not(.opened)').forEach((el,i)=>setTimeout(()=>openTile(el),i*300));return}
   if(d.bq){const r=$('#betR');if(r){r.value=d.bq;$('#betV').textContent=fmt(r.value)}return}
   if(d.tbgo){const r=$('#betR');if(r){sock.emit('tbet',{v:+r.value});b.disabled=true}return}
@@ -695,7 +787,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||
   if(d.pw){const cell=b.parentElement;cell.innerHTML=`<input type="text" placeholder="新密碼" style="width:8em" aria-label="新密碼"><button class="btn sm pri" data-pwgo="${esc(d.pw)}">確定</button>`;return}
   if(d.pwgo){const i=b.previousElementSibling;sock.emit('resetPass',{target:d.pwgo,pass:i.value});return}
 });
-document.addEventListener('input',e=>{if(e.target.id==='betR')$('#betV').textContent=fmt(e.target.value)});
+document.addEventListener('input',e=>{if(e.target.id==='betR')$('#betV').textContent=fmt(e.target.value);if(e.target.id==='heR')$('#heV').textContent=fmt(e.target.value);if(e.target.id==='buyR')$('#buyV').textContent=fmt(e.target.value)});
 document.addEventListener('change',e=>{if(!sock)return;const t=e.target;
   if(t.id==='maxSel'){sock.emit('setMaxX',{x:+t.value});return}
   if(t.id==='grabSel'){sock.emit('setGrab',{sec:+t.value});return}

@@ -130,13 +130,13 @@ function rt(tid) {
 const online = uid => (io.sockets.adapter.rooms.get('u:' + uid)?.size || 0) > 0;
 const ownerOf = g => (g.seats.find(s => online(s.uid)) || g.seats[0] || {}).uid || null;
 // 遊戲種類：niuniu 牛牛 / tuitong 推筒子
-const gameOf = tid => S.tables[tid]?.game === 'tuitong' ? 'tuitong' : 'niuniu';
-const SERIES_OPTS = { niuniu: [3, 5, 10], tuitong: [4, 8] }; // 房主可選的每輪局數
+const gameOf = tid => { const g = S.tables[tid]?.game; return g === 'tuitong' || g === 'holdem' ? g : 'niuniu'; };
+const SERIES_OPTS = { niuniu: [3, 5, 10], tuitong: [4, 8], holdem: [1] }; // 房主可選的每輪局數
 const seriesOptsOf = tid => SERIES_OPTS[gameOf(tid)];
 const seriesOf = tid => { const o = seriesOptsOf(tid), v = Number(S.tables[tid]?.series); return o.includes(v) ? v : (gameOf(tid) === 'tuitong' ? 4 : 5); };
-const maxSeatsOf = tid => gameOf(tid) === 'tuitong' ? 4 : 6;
+const maxSeatsOf = tid => gameOf(tid) === 'tuitong' ? 4 : 6; // 德州撲克也是 6 人桌
 const maxXOf = () => 10; // 推筒子下注範圍：底注 ～ 底注 × 10（例：底注 10 → 10～100）
-const isPlaying = g => ['grab', 'bet', 'tbet', 'peek'].includes(g.phase);
+const isPlaying = g => ['grab', 'bet', 'tbet', 'peek', 'hplay'].includes(g.phase);
 const PEEK_MS = 10000, DEAL_MS = 2600; // 推筒子：發牌動畫時間 + 掀牌時間
 const grabSecOf = tid => { const v = Number(S.tables[tid]?.grabSec); return v >= 5 && v <= 10 ? v : 8; };
 function pubTable(tid) {
@@ -146,7 +146,8 @@ function pubTable(tid) {
     game: gameOf(tid), maxSeats: maxSeatsOf(tid), seriesOpts: seriesOptsOf(tid), maxX: maxXOf(tid), maxBet: t.base * maxXOf(tid),
     wall: g.wall ? g.wall.length : null, shoeHand: g.shoeHand || 0, dice: g.dice || null, startUid: g.startUid || null,
     deadline: g.deadline, now: Date.now(), results: g.results, owner: ownerOf(g), seriesNo: g.seriesNo || 0, seriesTotal: g.seriesNo ? (g.seriesLen || seriesOf(tid)) : seriesOf(tid), grabSec: grabSecOf(tid),
-    seats: g.seats.map(s => ({ uid: s.uid, name: S.users[s.uid]?.name || '玩家', bal: S.users[s.uid]?.bal || 0, grab: s.grab, bet: s.bet, ready: !!s.ready, leave: !!s.leave, open: !!s.open, online: online(s.uid) })),
+    seats: g.seats.map(s => ({ uid: s.uid, name: S.users[s.uid]?.name || '玩家', bal: S.users[s.uid]?.bal || 0, grab: s.grab, bet: s.bet, ready: !!s.ready, leave: !!s.leave, open: !!s.open, online: online(s.uid), stack: s.stack || 0 })),
+    ...(gameOf(tid) === 'holdem' ? hePub(tid, g) : {}),
   };
 }
 const pushTable = tid => S.tables[tid] && io.to('t:' + tid).emit('table', pubTable(tid));
@@ -313,10 +314,169 @@ function ttSettle(tid) {
   save(); pushTable(tid); for (const s of g.seats) pushMe(s.uid); pushAdmin();
 }
 
+// ---------------- 德州撲克（隨時入座、隨時離開） ----------------
+// 入座時從餘額買入桌上籌碼（20～200 個大盲），離座時退回；盲注 = 底注的一半／底注
+const HE_MAX = 6, HE_ACT_MS = 20000, HE_OFF_MS = 5000, HE_NEXT_MS = 3000, HE_SHOW_MS = 7000, HE_FOLD_MS = 3500, HE_OFFLINE_KICK = 60000;
+const heBlinds = tid => { const b = S.tables[tid].base; return [Math.max(1, Math.floor(b / 2)), b]; };
+const heBuy = tid => { const bb = S.tables[tid].base; return [bb * 20, bb * 200]; };
+const HN = ['高牌', '一對', '兩對', '三條', '順子', '同花', '葫蘆', '四條', '同花順', '皇家同花順'];
+function heEval5(cs) {
+  const v = cs.map(c => c.r === 1 ? 14 : c.r).sort((a, b) => b - a), fl = cs.every(c => c.s === cs[0].s);
+  const u = [...new Set(v)]; let st = 0;
+  if (u.length === 5) { if (u[0] - u[4] === 4) st = u[0]; else if (u[0] === 14 && u[1] === 5) st = 5; }
+  const cnt = {}; v.forEach(x => cnt[x] = (cnt[x] || 0) + 1);
+  const gr = Object.entries(cnt).map(([k, n]) => [n, +k]).sort((a, b) => b[0] - a[0] || b[1] - a[1]);
+  if (st && fl) return { cat: st === 14 ? 9 : 8, key: [st] };
+  if (gr[0][0] === 4) return { cat: 7, key: [gr[0][1], gr[1][1]] };
+  if (gr[0][0] === 3 && gr[1][0] === 2) return { cat: 6, key: [gr[0][1], gr[1][1]] };
+  if (fl) return { cat: 5, key: v };
+  if (st) return { cat: 4, key: [st] };
+  if (gr[0][0] === 3) return { cat: 3, key: gr.map(g => g[1]) };
+  if (gr[0][0] === 2 && gr[1][0] === 2) return { cat: 2, key: gr.map(g => g[1]) };
+  if (gr[0][0] === 2) return { cat: 1, key: gr.map(g => g[1]) };
+  return { cat: 0, key: v };
+}
+function heCmp(a, b) { if (a.cat !== b.cat) return a.cat - b.cat; for (let i = 0; i < Math.max(a.key.length, b.key.length); i++) { const d = (a.key[i] || 0) - (b.key[i] || 0); if (d) return d; } return 0; }
+function heBest(cs) {
+  let best = null;
+  for (let i = 0; i < cs.length; i++) for (let j = i + 1; j < cs.length; j++) {
+    const five = cs.filter((_, k) => k !== i && k !== j); if (five.length !== 5) continue;
+    const e = heEval5(five); if (!best || heCmp(e, best) > 0) { best = e; best.cards = five; }
+  }
+  if (cs.length === 5) { best = heEval5(cs); best.cards = cs; }
+  best.name = HN[best.cat]; return best;
+}
+// 桌上籌碼備份：伺服器重啟時退回餘額（手牌進行到一半就當作沒發生）
+function heBackup(tid) { if (!S.hstk) S.hstk = {}; for (const s of rt(tid).seats) S.hstk[s.uid] = { tid, amt: s.stack }; save(); }
+function heRefund(tid, s, why) {
+  const u = S.users[s.uid]; if (S.hstk) delete S.hstk[s.uid];
+  if (u && s.stack > 0) { u.bal += s.stack; S.ledger.unshift({ id: newId(), uid: s.uid, delta: s.stack, reason: why || '德州撲克離座，桌上籌碼退回', by: s.uid, at: Date.now() }); S.ledger = S.ledger.slice(0, 500); }
+  s.stack = 0; save(); pushMe(s.uid); pushAdmin();
+}
+function heStand(tid, uid, why) {
+  const g = rt(tid), s = g.seats.find(x => x.uid === uid); if (!s) return;
+  const hd = g.hd, p = hd && g.phase === 'hplay' ? hd.ps[uid] : null;
+  if (p && !p.fold) { s.leave = true; if (hd.cur === uid) heAct(tid, uid, 'fold'); else { p.fold = true; heAfter(tid, uid, true); } return; }
+  if (p) { s.leave = true; return; } // 已棄牌，這手結束後再退籌碼
+  heRefund(tid, s, why); g.seats = g.seats.filter(x => x.uid !== uid); pushTable(tid); pushLobby();
+}
+function heStart(tid) {
+  const t = S.tables[tid], g = rt(tid), [SB, BB] = heBlinds(tid);
+  for (const s of g.seats.filter(x => x.leave)) heRefund(tid, s);
+  g.seats = g.seats.filter(x => !x.leave);
+  const el = g.seats.filter(s => s.stack > 0 && online(s.uid));
+  if (el.length < 2) { g.phase = 'idle'; g.hd = null; g.deadline = null; pushTable(tid); pushLobby(); return; }
+  // 莊家按鈕：上一手按鈕之後的下一位
+  const seatIdx = uid => g.seats.findIndex(s => s.uid === uid);
+  let bi = g.btn ? seatIdx(g.btn) : -1, btn = null;
+  for (let k = 1; k <= g.seats.length; k++) { const s = g.seats[(bi + k + g.seats.length) % g.seats.length]; if (el.includes(s)) { btn = s.uid; break; } }
+  g.btn = btn;
+  const bpos = el.findIndex(s => s.uid === btn), ord = [...el.slice(bpos + 1), ...el.slice(0, bpos + 1)].map(s => s.uid); // 按鈕最後
+  const deck = []; for (let r = 1; r <= 13; r++) for (let s = 0; s < 4; s++) deck.push({ r, s });
+  for (let i = deck.length - 1; i > 0; i--) { const j = rnd(i + 1); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+  const ps = {}; for (const uid of ord) ps[uid] = { hole: [deck.pop(), deck.pop()], bet: 0, tot: 0, fold: false, allin: false, acted: false };
+  const hd = { deck, board: [], ps, ord, street: 0, curBet: 0, minRaise: BB, cur: null, btn };
+  const sbU = ord.length === 2 ? btn : ord[0], bbU = ord.length === 2 ? ord[0] : ord[1];
+  hd.sb = sbU; hd.bb = bbU; g.hd = hd; g.round++; g.results = null; g.phase = 'hplay';
+  heBackup(tid);
+  const post = (uid, amt) => { const s = g.seats.find(x => x.uid === uid), p = ps[uid], a = Math.min(amt, s.stack); s.stack -= a; p.bet += a; p.tot += a; if (!s.stack) p.allin = true; };
+  post(sbU, SB); post(bbU, BB); hd.curBet = BB;
+  for (const uid of ord) io.to('u:' + uid).emit('hhole', { tid, round: g.round, cards: ps[uid].hole });
+  // 翻牌前：大盲之後的人先說話（兩人時由按鈕／小盲先說話）
+  hd.cur = heNext(g, bbU); if (!hd.cur || heLive(g).filter(u => !ps[u].allin).length < 2 && ps[hd.cur]?.bet >= hd.curBet) return heStreetEnd(tid);
+  heDeadline(tid); pushTable(tid); pushLobby();
+}
+const heLive = g => g.hd.ord.filter(u => !g.hd.ps[u].fold);
+function heNext(g, from) { const o = g.hd.ord, i = o.indexOf(from); for (let k = 1; k <= o.length; k++) { const u = o[(i + k) % o.length], p = g.hd.ps[u]; if (!p.fold && !p.allin) return u; } return null; }
+function heDeadline(tid) { const g = rt(tid); g.deadline = Date.now() + (online(g.hd.cur) ? HE_ACT_MS : HE_OFF_MS); }
+function heAct(tid, uid, type, to) {
+  const g = rt(tid), hd = g.hd; if (!hd || g.phase !== 'hplay' || hd.cur !== uid) return '還沒輪到你';
+  const s = g.seats.find(x => x.uid === uid), p = hd.ps[uid], need = hd.curBet - p.bet;
+  const put = a => { a = Math.min(a, s.stack); s.stack -= a; p.bet += a; p.tot += a; if (!s.stack) p.allin = true; };
+  if (type === 'fold') p.fold = true;
+  else if (type === 'check') { if (need > 0) return '現在不能過牌'; }
+  else if (type === 'call') { if (need <= 0) return '現在不用跟注'; put(need); }
+  else if (type === 'raise' || type === 'allin') {
+    to = type === 'allin' ? p.bet + s.stack : Math.round(Number(to));
+    if (!(to > hd.curBet)) return type === 'allin' ? heAct(tid, uid, need > 0 ? 'call' : 'check') : '加注金額要大於目前的注額';
+    if (to - p.bet > s.stack) return '桌上籌碼不夠';
+    const inc = to - hd.curBet, isAll = to - p.bet === s.stack;
+    if (inc < hd.minRaise && !isAll) return `最少要加到 ${hd.curBet + hd.minRaise}`;
+    put(to - p.bet);
+    if (inc >= hd.minRaise) { hd.minRaise = inc; for (const u of hd.ord) if (u !== uid && !hd.ps[u].fold && !hd.ps[u].allin) hd.ps[u].acted = false; }
+    hd.curBet = Math.max(hd.curBet, p.bet);
+  } else return '無效的動作';
+  p.acted = true; p.last = type === 'allin' || p.allin ? 'allin' : type;
+  heAfter(tid, uid, false); return null;
+}
+function heAfter(tid, uid, outOfTurn) {
+  const g = rt(tid), hd = g.hd;
+  if (heLive(g).length === 1) return heSettle(tid);
+  const wait = hd.ord.filter(u => { const p = hd.ps[u]; return !p.fold && !p.allin && (!p.acted || p.bet < hd.curBet); });
+  if (!wait.length) return heStreetEnd(tid);
+  if (!outOfTurn || hd.cur === uid || !wait.includes(hd.cur)) { const o = hd.ord, i = o.indexOf(hd.cur === uid || !outOfTurn ? uid : hd.cur); hd.cur = null; for (let k = 1; k <= o.length; k++) { const c = o[(i + k) % o.length]; if (wait.includes(c)) { hd.cur = c; break; } } }
+  heDeadline(tid); pushTable(tid);
+}
+function heStreetEnd(tid) {
+  const g = rt(tid), hd = g.hd;
+  for (const u of hd.ord) { const p = hd.ps[u]; p.bet = 0; p.acted = false; p.last = p.fold ? 'fold' : p.allin ? 'allin' : null; }
+  hd.curBet = 0; hd.minRaise = heBlinds(tid)[1];
+  if (hd.street >= 3) return heSettle(tid);
+  hd.street++; if (hd.street === 1) hd.board.push(hd.deck.pop(), hd.deck.pop(), hd.deck.pop()); else hd.board.push(hd.deck.pop());
+  const able = heLive(g).filter(u => !hd.ps[u].allin);
+  if (able.length < 2) { hd.cur = null; g.deadline = Date.now() + 1400; hd.runout = true; pushTable(tid); return; } // 全下後自動發完公牌
+  hd.cur = heNext(g, hd.btn); heDeadline(tid); pushTable(tid);
+}
+function heSettle(tid) {
+  const t = S.tables[tid], g = rt(tid), hd = g.hd, live = heLive(g), show = live.length > 1;
+  while (show && hd.board.length < 5) hd.board.push(hd.deck.pop());
+  const ev = {}; if (show) for (const u of live) ev[u] = heBest([...hd.ps[u].hole, ...hd.board]);
+  const won = {}; hd.ord.forEach(u => won[u] = 0);
+  const levels = [...new Set(hd.ord.map(u => hd.ps[u].tot).filter(x => x > 0))].sort((a, b) => a - b); let prev = 0; const pots = [];
+  for (const L of levels) {
+    const amt = hd.ord.reduce((a, u) => a + Math.max(0, Math.min(hd.ps[u].tot, L) - prev), 0);
+    let el = live.filter(u => hd.ps[u].tot >= L); if (!el.length) el = live;
+    let w = el; if (show) { let best = null; for (const u of el) { const c = best ? heCmp(ev[u], ev[best[0]]) : 1; if (c > 0) best = [u]; else if (c === 0) best.push(u); } w = best; }
+    const each = Math.floor(amt / w.length); let rem = amt - each * w.length;
+    for (const u of hd.ord) if (w.includes(u)) { won[u] += each + (rem > 0 ? 1 : 0); if (rem > 0) rem--; }
+    pots.push({ amt, win: w }); prev = L;
+  }
+  for (const u of hd.ord) { const s = g.seats.find(x => x.uid === u); if (s) s.stack += won[u]; }
+  g.results = hd.ord.map(u => { const p = hd.ps[u], e = ev[u]; return { uid: u, name: S.users[u]?.name || '玩家', fold: p.fold, cards: show && !p.fold ? p.hole : null, hand: e ? e.name : (p.fold ? '棄牌' : ''), cat: e ? e.cat : -1, best: e ? e.cards : null, won: won[u], delta: won[u] - p.tot }; });
+  g.pots = pots.filter(p => p.amt > 0).map(p => ({ amt: p.amt, win: p.win }));
+  S.history.unshift({ round: g.round, table: t.name, at: Date.now(), bankerName: '德州撲克', res: g.results.map(r => ({ uid: r.uid, hand: r.hand || '—', delta: r.delta })) });
+  S.history = S.history.slice(0, 300);
+  hd.cur = null; g.phase = 'hdone'; g.deadline = Date.now() + (show ? HE_SHOW_MS : HE_FOLD_MS);
+  heBackup(tid); pushTable(tid); for (const u of hd.ord) pushMe(u); pushAdmin();
+}
+function heTick(tid, now) {
+  const g = rt(tid);
+  if (g.phase === 'hplay' && g.hd) {
+    if (g.hd.runout) { if (now > g.deadline) { g.hd.runout = false; heStreetEnd(tid); } return; }
+    if (g.hd.cur && now > g.deadline) { const p = g.hd.ps[g.hd.cur]; heAct(tid, g.hd.cur, p.bet >= g.hd.curBet ? 'check' : 'fold'); }
+    else if (g.hd.cur && !online(g.hd.cur) && g.deadline - now > HE_OFF_MS) { g.deadline = now + HE_OFF_MS; pushTable(tid); }
+    return;
+  }
+  // 等待中／一手結束：離線超過 60 秒自動離座
+  let changed = false;
+  for (const s of [...g.seats]) { if (online(s.uid)) { if (s.offSince) { delete s.offSince; changed = true; } } else if (!s.offSince) { s.offSince = now; changed = true; } else if (now - s.offSince > HE_OFFLINE_KICK) { heStand(tid, s.uid, '德州撲克離線自動離座，桌上籌碼退回'); changed = true; } }
+  if (g.phase === 'hdone' && now > g.deadline) return heStart(tid);
+  if (g.phase === 'idle' && g.seats.filter(s => s.stack > 0 && online(s.uid)).length >= 2) { if (!g.wait) g.wait = now + HE_NEXT_MS; else if (now > g.wait) { g.wait = 0; return heStart(tid); } }
+  else if (g.phase === 'idle') g.wait = 0;
+  if (changed) pushTable(tid);
+}
+function hePub(tid, g) {
+  const hd = g.hd, [SB, BB] = heBlinds(tid), [mn, mx] = heBuy(tid);
+  return { blinds: [SB, BB], buyMin: mn, buyMax: mx, board: hd ? hd.board : [], pot: hd ? hd.ord.reduce((a, u) => a + hd.ps[u].tot, 0) : 0, curBet: hd ? hd.curBet : 0, minRaise: hd ? hd.minRaise : BB,
+    cur: hd ? hd.cur : null, btn: hd ? hd.btn : g.btn || null, sb: hd ? hd.sb : null, bb: hd ? hd.bb : null, street: hd ? hd.street : 0, pots: g.phase === 'hdone' ? g.pots : null,
+    hs: hd ? Object.fromEntries(hd.ord.map(u => { const p = hd.ps[u]; return [u, { bet: p.bet, tot: p.tot, fold: p.fold, allin: p.allin, last: p.last || null }]; })) : {} };
+}
+
 setInterval(() => {
   const now = Date.now();
   for (const tid in G) {
     const g = G[tid]; if (!S.tables[tid]) { delete G[tid]; continue; }
+    if (gameOf(tid) === 'holdem') { heTick(tid, now); continue; }
     if (g.phase === 'grab' && (g.seats.every(s => s.grab != null) || now > g.deadline)) resolveBanker(tid);
     else if (g.phase === 'bet' && (g.seats.every(s => s.uid === g.banker || s.bet != null) || now > g.deadline)) showdown(tid);
     else if (g.phase === 'tbet' && (g.seats.every(s => s.uid === g.banker || s.bet != null) || now > g.deadline)) ttDeal(tid);
@@ -362,13 +522,22 @@ io.on('connection', socket => {
     const g = rt(tid);
     if ((g.phase === 'grab' || g.phase === 'bet') && g.hands[uid]) socket.emit('hand', { tid, round: g.round, cards: g.hands[uid].slice(0, 4) });
     if (g.phase === 'peek' && g.hands[uid]) socket.emit('thand', { tid, round: g.round, tiles: g.hands[uid] });
+    if (g.hd && g.hd.ps[uid] && (g.phase === 'hplay' || g.phase === 'hdone')) socket.emit('hhole', { tid, round: g.round, cards: g.hd.ps[uid].hole });
     pushTable(tid);
   });
   socket.on('exit', () => { if (cur) { socket.leave('t:' + cur); cur = null; } });
-  socket.on('sit', () => {
+  socket.on('sit', ({ v } = {}) => {
     if (!cur) return; const g = rt(cur), t = S.tables[cur];
     if (g.seats.some(s => s.uid === uid)) return;
     for (const tid in G) if (G[tid].seats.some(s => s.uid === uid)) return toast('你已經坐在其他牌桌');
+    if (gameOf(cur) === 'holdem') {
+      const [mn, mx] = heBuy(cur); v = Math.round(Number(v)) || mn * 5;
+      if (g.seats.length >= HE_MAX) return toast('這桌已經坐滿了');
+      if (u().bal < mn) return toast(`至少要有 ${mn.toLocaleString()} 籌碼才能入座（20 個大盲）`);
+      v = Math.max(mn, Math.min(v, mx, u().bal));
+      u().bal -= v; S.ledger.unshift({ id: newId(), uid, delta: -v, reason: `德州撲克買入（${t.name}）`, by: uid, at: Date.now() }); S.ledger = S.ledger.slice(0, 500);
+      g.seats.push({ uid, stack: v }); heBackup(cur); pushMe(uid); pushAdmin(); pushTable(cur); pushLobby(); return;
+    }
     if (g.phase !== 'idle') return toast('這一輪牌局進行中，結束後再入座');
     if (g.seats.length >= maxSeatsOf(cur)) return toast('這桌已經坐滿了');
     if (u().bal < t.base) return toast('籌碼不足，請先申請籌碼');
@@ -376,6 +545,7 @@ io.on('connection', socket => {
   });
   socket.on('stand', () => {
     if (!cur) return; const g = rt(cur), s = g.seats.find(x => x.uid === uid); if (!s || s.leave) return;
+    if (gameOf(cur) === 'holdem') { heStand(cur, uid); pushTable(cur); pushLobby(); return; }
     if (seriesActive(cur, g)) { s.leave = true; penalize(cur, uid, '中途離座罰金'); }
     if (g.phase === 'idle' || g.phase === 'done') g.seats = g.seats.filter(x => x.uid !== uid); else s.leave = true;
     pushTable(cur); pushLobby();
@@ -407,6 +577,18 @@ io.on('connection', socket => {
     if (!seriesOptsOf(cur).includes(n)) return;
     if (g.seriesNo) return toast('這一輪進行中，打完再調整');
     S.tables[cur].series = n; save(); pushTable(cur); toast('每輪局數已改為 ' + n + (gameOf(cur) === 'tuitong' ? ' 把' : ' 局'));
+  });
+  socket.on('hact', ({ a, v } = {}) => {
+    if (!cur || gameOf(cur) !== 'holdem') return;
+    const err = heAct(cur, uid, String(a), v); if (err) toast(err);
+  });
+  socket.on('hbuy', ({ v } = {}) => {
+    if (!cur || gameOf(cur) !== 'holdem') return; const g = rt(cur), s = g.seats.find(x => x.uid === uid); if (!s) return;
+    if (g.phase === 'hplay' && g.hd && g.hd.ps[uid] && !g.hd.ps[uid].fold) return toast('這一手打完再補充籌碼');
+    const [, mx] = heBuy(cur); v = Math.round(Number(v)); const room = mx - s.stack;
+    if (!(v > 0)) return; v = Math.min(v, room, u().bal); if (v <= 0) return toast(room <= 0 ? `桌上籌碼最多 ${mx.toLocaleString()}` : '餘額不足');
+    u().bal -= v; s.stack += v; S.ledger.unshift({ id: newId(), uid, delta: -v, reason: `德州撲克補充籌碼（${S.tables[cur].name}）`, by: uid, at: Date.now() }); S.ledger = S.ledger.slice(0, 500);
+    heBackup(cur); pushMe(uid); pushAdmin(); pushTable(cur); toast(`補充了 ${v.toLocaleString()} 籌碼`);
   });
   socket.on('open', () => {
     if (!cur) return; const g = rt(cur), s = g.seats.find(x => x.uid === uid);
@@ -465,7 +647,7 @@ io.on('connection', socket => {
   socket.on('createTable', ({ name, base, game } = {}) => {
     if (!isAdmin()) return; name = String(name || '').trim().slice(0, 16) || '新牌桌'; base = Math.round(Number(base));
     if (![10, 50, 100, 500, 1000].includes(base)) base = 10;
-    game = game === 'tuitong' ? 'tuitong' : 'niuniu';
+    game = game === 'tuitong' || game === 'holdem' ? game : 'niuniu';
     const id = newId(); S.tables[id] = { id, name, base, game }; save(); pushLobby(); toast('已建立牌桌');
   });
   socket.on('editTable', ({ tid, base } = {}) => {
@@ -488,6 +670,9 @@ io.on('connection', socket => {
 load().then(ensureAdmin).then(() => {
   // 舊資料只有牛牛桌時，自動補一張推筒子桌
   if (!Object.values(S.tables).some(t => t.game === 'tuitong')) { const t = { id: newId(), name: '推筒子一號桌', base: 10, game: 'tuitong' }; S.tables[t.id] = t; save(); }
+  if (!Object.values(S.tables).some(t => t.game === 'holdem')) { const t = { id: newId(), name: '德州撲克一號桌', base: 10, game: 'holdem' }; S.tables[t.id] = t; save(); }
+  // 德州撲克：伺服器重啟前還在桌上的籌碼，全部退回餘額
+  if (S.hstk) { for (const [uid, x] of Object.entries(S.hstk)) { const u = S.users[uid]; if (u && x.amt > 0) { u.bal += x.amt; S.ledger.unshift({ id: newId(), uid, delta: x.amt, reason: '德州撲克桌上籌碼退回（伺服器重新啟動）', by: uid, at: Date.now() }); } } S.hstk = {}; save(); }
   server.listen(PORT, () => console.log('哪有小孩天天輸 伺服器啟動於 port ' + PORT));
 }).catch(e => { console.error('啟動失敗', e); process.exit(1); });
 process.on('SIGTERM', async () => { clearTimeout(saveTimer); await flush(); process.exit(0); });

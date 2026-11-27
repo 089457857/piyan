@@ -180,7 +180,7 @@ function pubTable(tid) {
     game: gameOf(tid), maxSeats: maxSeatsOf(tid), seriesOpts: seriesOptsOf(tid), maxX: maxXOf(tid), maxBet: t.base * maxXOf(tid),
     wall: g.wall ? g.wall.length : null, shoeHand: g.shoeHand || 0, dice: g.dice || null, startUid: g.startUid || null,
     deadline: g.deadline, now: Date.now(), results: g.results, owner: ownerOf(g), seriesNo: g.seriesNo || 0, seriesTotal: g.seriesNo ? (g.seriesLen || seriesOf(tid)) : seriesOf(tid), grabSec: grabSecOf(tid),
-    seats: g.seats.map(s => ({ uid: s.uid, name: S.users[s.uid]?.name || '玩家', bal: S.users[s.uid]?.bal || 0, grab: s.grab, bet: s.bet, ready: !!s.ready, leave: !!s.leave, open: !!s.open, online: online(s.uid), stack: s.stack || 0 })),
+    seats: g.seats.map(s => ({ uid: s.uid, name: S.users[s.uid]?.name || '玩家', bal: S.users[s.uid]?.bal || 0, grab: s.grab, bet: s.bet, ready: !!s.ready, leave: !!s.leave, open: !!s.open, online: online(s.uid), stack: s.stack || 0, pend: s.pend || 0 })),
     ...(gameOf(tid) === 'holdem' ? hePub(tid, g) : {}),
   };
 }
@@ -387,6 +387,12 @@ function heRefund(tid, s, why) {
   if (u && s.stack > 0) { u.bal += s.stack; S.ledger.unshift({ id: newId(), uid: s.uid, delta: s.stack, reason: why || '德州撲克離座，桌上籌碼退回', by: s.uid, at: Date.now() }); S.ledger = S.ledger.slice(0, 500); }
   s.stack = 0; save(); pushMe(s.uid); pushAdmin();
 }
+// 補碼：把餘額的籌碼加到桌上（上限 200 個大盲）
+function heTopUp(tid, s, v) {
+  const u = S.users[s.uid], [, mx] = heBuy(tid); v = Math.min(Math.round(v), mx - s.stack, u ? u.bal : 0); if (!(v > 0)) return 0;
+  u.bal -= v; s.stack += v; S.ledger.unshift({ id: newId(), uid: s.uid, delta: -v, reason: `德州撲克補碼（${S.tables[tid].name}）`, by: s.uid, at: Date.now() }); S.ledger = S.ledger.slice(0, 500);
+  return v;
+}
 function heStand(tid, uid, why) {
   const g = rt(tid), s = g.seats.find(x => x.uid === uid); if (!s) return;
   const hd = g.hd, p = hd && g.phase === 'hplay' ? hd.ps[uid] : null;
@@ -398,6 +404,9 @@ function heStart(tid) {
   const t = S.tables[tid], g = rt(tid), [SB, BB] = heBlinds(tid);
   for (const s of g.seats.filter(x => x.leave)) heRefund(tid, s);
   g.seats = g.seats.filter(x => !x.leave);
+  // 上一手登記的補碼，在發新的一手之前補上
+  for (const s of g.seats) if (s.pend) { const v = heTopUp(tid, s, s.pend); delete s.pend; if (v) { pushMe(s.uid); io.to('u:' + s.uid).emit('toast', `已補碼 ${v.toLocaleString()}`); } }
+  pushAdmin();
   const el = g.seats.filter(s => s.stack > 0 && online(s.uid));
   if (el.length < 2) { g.phase = 'idle'; g.hd = null; g.deadline = null; pushTable(tid); pushLobby(); return; }
   // 莊家按鈕：上一手按鈕之後的下一位
@@ -618,11 +627,15 @@ io.on('connection', socket => {
   });
   socket.on('hbuy', ({ v } = {}) => {
     if (!cur || gameOf(cur) !== 'holdem') return; const g = rt(cur), s = g.seats.find(x => x.uid === uid); if (!s) return;
-    if (g.phase === 'hplay' && g.hd && g.hd.ps[uid] && !g.hd.ps[uid].fold) return toast('這一手打完再補充籌碼');
-    const [, mx] = heBuy(cur); v = Math.round(Number(v)); const room = mx - s.stack;
-    if (!(v > 0)) return; v = Math.min(v, room, u().bal); if (v <= 0) return toast(room <= 0 ? `桌上籌碼最多 ${mx.toLocaleString()}` : '餘額不足');
-    u().bal -= v; s.stack += v; S.ledger.unshift({ id: newId(), uid, delta: -v, reason: `德州撲克補充籌碼（${S.tables[cur].name}）`, by: uid, at: Date.now() }); S.ledger = S.ledger.slice(0, 500);
-    heBackup(cur); pushMe(uid); pushAdmin(); pushTable(cur); toast(`補充了 ${v.toLocaleString()} 籌碼`);
+    if (s.leave) return;
+    const [, mx] = heBuy(cur); v = Math.round(Number(v)) || 0; const room = mx - s.stack;
+    if (v <= 0) { if (s.pend) { delete s.pend; pushTable(cur); toast('已取消補碼'); } return; }
+    if (room <= 0) return toast(`桌上籌碼最多 ${mx.toLocaleString()}（200 個大盲）`);
+    if (u().bal <= 0) return toast('餘額不足，請到「我的籌碼」申請');
+    // 手牌進行中：先登記，這一手結束、下一手發牌前自動補上
+    if (g.phase === 'hplay' && g.hd && g.hd.ps[uid]) { s.pend = Math.min(v, room, u().bal); pushTable(cur); return toast(`這一手結束後會補碼 ${s.pend.toLocaleString()}`); }
+    const got = heTopUp(cur, s, v); if (!got) return;
+    heBackup(cur); pushMe(uid); pushAdmin(); pushTable(cur); toast(`已補碼 ${got.toLocaleString()}`);
   });
   socket.on('open', () => {
     if (!cur) return; const g = rt(cur), s = g.seats.find(x => x.uid === uid);

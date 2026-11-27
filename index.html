@@ -659,6 +659,7 @@ function runFxTT(t,order){
 const RULES_HE='德州撲克：每人 2 張手牌，加上桌面 5 張公牌，取最好的 5 張比大小。皇家同花順 ＞ 同花順 ＞ 四條 ＞ 葫蘆 ＞ 同花 ＞ 順子 ＞ 三條 ＞ 兩對 ＞ 一對 ＞ 高牌。流程：發手牌 → 翻牌前下注 → 翻牌（3 張）→ 轉牌 → 河牌，每一輪都可以過牌、跟注、加注、全下或棄牌。盲注是底注的一半／底注，莊家按鈕每手輪流。隨時可以入座：入座時從餘額買入 20～200 個大盲的桌上籌碼，離座時剩下的籌碼退回餘額，沒有罰金。每次行動有 20 秒，時間到自動過牌或棄牌。';
 const STREET=['翻牌前','翻牌','轉牌','河牌'],LAST={fold:'棄牌',check:'過牌',call:'跟注',raise:'加注',allin:'全下'};
 const chipIco='<svg><use href="#chip"/></svg>';
+let topOpen=false,topVal=0;
 function renderHE(){
   ensureSeats();const t=table,uid=me&&me.id,hs=t.hs||{},[SB,BB]=t.blinds||[5,10];
   const tw=$('#tw');tw.classList.remove('tt');tw.classList.add('he');$('#deck').hidden=true;$('#dice').hidden=true;$('#wallv').hidden=true;$('#setBtn').hidden=true;$('#setPanel').hidden=true;$('#rules').textContent=RULES_HE;
@@ -707,10 +708,16 @@ function renderHE(){
     const half=Math.max(minTo,Math.min(maxTo,t.curBet+Math.round(t.pot/2))),full=Math.max(minTo,Math.min(maxTo,t.curBet+t.pot));
     a=`<div class="hebar"><button class="btn red" data-he="fold">棄牌</button>${need>0?`<button class="btn pri" data-he="call">${need>=stack?'全下跟注 '+fmt(stack):'跟注 '+fmt(need)}</button>`:'<button class="btn pri" data-he="check">過牌</button>'}
       ${canRaise&&need<stack?`<span class="lab">${t.curBet?'加注到':'下注'}</span><input type="range" id="heR" min="${minTo}" max="${maxTo}" step="${Math.max(1,Math.floor(BB/2))}" value="${minTo}" aria-label="加注金額"><span class="betv" id="heV">${fmt(minTo)}</span><button class="btn sm" data-hq="${half}">½ 池</button><button class="btn sm" data-hq="${full}">1 池</button><button class="btn pri" data-hraise="1">${t.curBet?'加注':'下注'}</button><button class="btn red sm" data-he="allin">全下 ${fmt(stack)}</button>`:''}</div>`}
-  else{const inLive=playing&&mh&&!mh.fold;const room=t.buyMax-my.stack,canTop=!inLive&&room>0&&bal>0;
-    a=`<span class="lab">${playing?(mh?(mh.fold?'你已棄牌，等這一手結束':'等待其他玩家行動…'):'這一手打完就會發牌給你'):done?'下一手即將開始':t.seats.length<2?'等待其他玩家入座':'下一手即將開始'}</span>`+
-      (canTop?`<button class="btn sm" data-htop="${Math.min(room,bal)}">補滿籌碼（+${fmt(Math.min(room,bal))}）</button>`:'')+`<button class="btn sm" data-a="stand">${inLive?'棄牌並離座':'離座（籌碼退回餘額）'}</button>`}
-  if($('#acts')._h!==a){$('#acts').innerHTML=a;$('#acts')._h=a}
+  else{const inLive=playing&&mh&&!mh.fold,inHand=playing&&mh;const room=t.buyMax-my.stack,tmax=Math.min(room,bal),canTop=tmax>0&&!my.leave;if(!canTop)topOpen=false;
+    const lab=`<span class="lab">${playing?(mh?(mh.fold?'你已棄牌，等這一手結束':'等待其他玩家行動…'):'這一手打完就會發牌給你'):done?'下一手即將開始':t.seats.length<2?'等待其他玩家入座':'下一手即將開始'}</span>`;
+    // 補碼：把餘額加到桌上；手牌進行中按的話，這一手結束後才補上
+    let top='';
+    if(my.pend)top=`<span class="lab">這一手結束後補碼 <b>${fmt(my.pend)}</b></span><button class="btn sm" data-htop="0">取消補碼</button>`;
+    else if(canTop&&topOpen){const st=Math.min(BB,tmax);top=`<div class="hebar"><span class="lab">補碼</span><input type="range" id="topR" min="${st}" max="${tmax}" step="${st}" value="${tmax}" aria-label="補碼金額"><span class="betv" id="topV">${fmt(tmax)}</span><button class="btn sm" data-topall="${tmax}">全部 ${fmt(tmax)}</button><button class="btn pri sm" data-topgo="1">${inHand?'這手結束後補':'確定補碼'}</button><button class="btn sm" data-topx="1">取消</button></div>`}
+    else if(canTop)top=`<button class="btn sm pri" data-topo="1">補碼</button>`;
+    else if(room<=0&&!my.leave)top=`<span class="lab">桌上籌碼已達上限 ${fmt(t.buyMax)}</span>`;
+    a=lab+top+`<button class="btn sm" data-a="stand">${inLive?'棄牌並離座':'離座（籌碼退回餘額）'}</button>`}
+  if($('#acts')._h!==a){$('#acts').innerHTML=a;$('#acts')._h=a;const r=$('#topR');if(r&&topVal){r.value=topVal;$('#topV').textContent=fmt(r.value)}}
 }
 function runFxHE(t,order){
   if(RM.matches)return;const idx={};order.forEach((s,i)=>{if(s)idx[s.uid]=i});
@@ -782,6 +789,9 @@ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||
   if(d.hq){const r=$('#heR');if(r){r.value=d.hq;$('#heV').textContent=fmt(r.value)}return}
   if(d.hraise){const r=$('#heR');if(r){sock.emit('hact',{a:'raise',v:+r.value});b.disabled=true}return}
   if(d.htop){sock.emit('hbuy',{v:+d.htop});return}
+  if(d.topo||d.topx){topOpen=!!d.topo;topVal=0;$('#acts')._h=null;renderTable();return}
+  if(d.topall){const r=$('#topR');if(r){r.value=d.topall;topVal=+d.topall;$('#topV').textContent=fmt(d.topall)}return}
+  if(d.topgo){const r=$('#topR');if(r){sock.emit('hbuy',{v:topVal||+r.value});topOpen=false;topVal=0;$('#acts')._h=null;renderTable()}return}
   if(d.openall){document.querySelectorAll('.mj3:not(.opened)').forEach((el,i)=>setTimeout(()=>openTile(el),i*300));return}
   if(d.bq){const r=$('#betR');if(r){r.value=d.bq;$('#betV').textContent=fmt(r.value)}return}
   if(d.tbgo){const r=$('#betR');if(r){sock.emit('tbet',{v:+r.value});b.disabled=true}return}
@@ -793,7 +803,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||
   if(d.pw){const cell=b.parentElement;cell.innerHTML=`<input type="text" placeholder="新密碼" style="width:8em" aria-label="新密碼"><button class="btn sm pri" data-pwgo="${esc(d.pw)}">確定</button>`;return}
   if(d.pwgo){const i=b.previousElementSibling;sock.emit('resetPass',{target:d.pwgo,pass:i.value});return}
 });
-document.addEventListener('input',e=>{if(e.target.id==='betR')$('#betV').textContent=fmt(e.target.value);if(e.target.id==='heR')$('#heV').textContent=fmt(e.target.value);if(e.target.id==='buyR')$('#buyV').textContent=fmt(e.target.value)});
+document.addEventListener('input',e=>{if(e.target.id==='betR')$('#betV').textContent=fmt(e.target.value);if(e.target.id==='heR')$('#heV').textContent=fmt(e.target.value);if(e.target.id==='buyR')$('#buyV').textContent=fmt(e.target.value);if(e.target.id==='topR'){topVal=+e.target.value;$('#topV').textContent=fmt(e.target.value)}});
 document.addEventListener('change',e=>{if(!sock)return;const t=e.target;
   if(t.id==='maxSel'){sock.emit('setMaxX',{x:+t.value});return}
   if(t.id==='grabSel'){sock.emit('setGrab',{sec:+t.value});return}

@@ -25,7 +25,8 @@ async function load() {
       connectionString: DATABASE_URL,
       ssl: /render\.com|sslmode=require/.test(DATABASE_URL) ? { rejectUnauthorized: false } : false,
     });
-    await pool.query('CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v JSONB NOT NULL)');
+    // 兩個遊戲共用資料庫，同時啟動時可能一起建立資料表：撞到「已經存在」就當作成功
+    try { await pool.query('CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v JSONB NOT NULL)'); } catch (e) { if (!['23505', '42P07'].includes(e.code)) throw e; }
     const r = await pool.query("SELECT v FROM kv WHERE k='state'");
     if (r.rows[0]) S = Object.assign(S, r.rows[0].v);
     console.log('已連上 Postgres 資料庫');
@@ -88,7 +89,8 @@ const rnd = n => crypto.randomInt(n);
 
 // ---------------- HTTP ----------------
 const app = express();
-app.use(express.json({ limit: '10kb' }));
+const json10 = express.json({ limit: '10kb' });
+app.use((req, res, next) => req.path === '/api/restore' ? next() : json10(req, res, next));
 // index.html 可放在 public/ 資料夾，也可以直接放在最外層
 const PUB = path.join(__dirname, 'public');
 const pageFile = () => fs.existsSync(path.join(PUB, 'index.html')) ? path.join(PUB, 'index.html') : path.join(__dirname, 'index.html');
@@ -117,6 +119,38 @@ app.post('/api/login', async (req, res) => {
   res.json({ token });
 });
 app.get('/healthz', (_, res) => res.send('ok'));
+
+// ---------------- 資料備份／還原（管理員） ----------------
+// 牛牛和屁眼王國大冒險共用同一個資料庫，備份檔會把資料庫裡所有遊戲的資料一起存下來
+const adminOf = req => { const uid = S.sessions[String(req.get('x-token') || '')]; return uid && S.users[uid]?.admin ? uid : null; };
+app.get('/api/backup', async (req, res) => {
+  if (!adminOf(req)) return res.status(403).json({ error: '只有管理員可以下載備份' });
+  clearTimeout(saveTimer); await flush();
+  const rows = {};
+  if (pool) { const r = await pool.query('SELECT k, v FROM kv'); for (const x of r.rows) if (!x.k.endsWith(':reload')) rows[x.k] = x.v; }
+  else rows.state = S;
+  const stamp = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 16).replace(/[-:T]/g, '');
+  res.set('Content-Disposition', `attachment; filename="game-backup-${stamp}.json"`);
+  res.json({ type: 'naiyou-backup', version: 1, at: Date.now(), rows });
+});
+app.post('/api/restore', express.json({ limit: '50mb' }), async (req, res) => {
+  const by = adminOf(req); if (!by) return res.status(403).json({ error: '只有管理員可以還原備份' });
+  const b = req.body || {}, rows = b.rows;
+  if (b.type !== 'naiyou-backup' || !rows || typeof rows !== 'object' || !rows.state || !rows.state.users) return res.status(400).json({ error: '這不是正確的備份檔' });
+  try {
+    clearTimeout(saveTimer);
+    if (pool) {
+      for (const [k, v] of Object.entries(rows)) await pool.query('INSERT INTO kv (k, v) VALUES ($1, $2) ON CONFLICT (k) DO UPDATE SET v = EXCLUDED.v', [k, JSON.stringify(v)]);
+      for (const k of Object.keys(rows)) if (k !== 'state') await pool.query('INSERT INTO kv (k, v) VALUES ($1, $2) ON CONFLICT (k) DO UPDATE SET v = EXCLUDED.v', [k + ':reload', JSON.stringify({ at: Date.now() })]);
+    }
+    S = Object.assign({ users: {}, sessions: {}, requests: {}, ledger: [], tables: {}, history: [], seq: 1 }, rows.state);
+    for (const k in G) delete G[k];
+    if (S.hstk) { for (const [uid, x] of Object.entries(S.hstk)) { const u = S.users[uid]; if (u && x.amt > 0) u.bal += x.amt; } S.hstk = {}; }
+    await ensureAdmin(); await flush();
+    res.json({ ok: true, users: Object.keys(S.users).length, games: Object.keys(rows) });
+    setTimeout(() => io.disconnectSockets(true), 300);
+  } catch (e) { console.error('還原失敗', e); res.status(500).json({ error: '還原失敗：' + e.message }); }
+});
 
 const server = http.createServer(app);
 const io = new Server(server);

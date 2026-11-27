@@ -259,6 +259,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:now
  table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--line)}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:6.5em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:6em;margin-inline-start:-6.5em;color:var(--dim)}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0ms!important;transition:none!important}}
+.afk{position:fixed;inset:0;z-index:99;display:grid;place-items:center;background:#000c;padding:16px}.afk[hidden]{display:none}.afk .box{max-width:380px;text-align:center}
 </style>
 </head>
 <body>
@@ -377,11 +378,16 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:now
         </div>
       </div>
       <div class="box" style="margin-top:16px"><h2>玩家</h2><div id="aUsers"></div></div>
+      <div class="box" style="margin-top:16px"><h2>資料備份</h2>
+        <p class="note" style="margin-top:0">Render 的免費資料庫建立 30 天後會到期，到期前記得先下載備份。這個備份檔會同時保存「哪有小孩天天輸」和「屁眼王國大冒險」的所有資料（帳號、籌碼、角色）。換成新的資料庫後，在這裡選備份檔還原，兩個遊戲的資料就都回來了。</p>
+        <div class="row"><button class="btn pri" type="button" id="bkDown">下載備份</button><label class="btn" for="bkFile" style="display:inline-grid;place-items:center">選擇備份檔還原</label><input type="file" id="bkFile" accept=".json,application/json" hidden></div>
+        <div class="rsub" id="bkMsg" style="margin-top:8px"></div></div>
       <div class="box" style="margin-top:16px"><h2>籌碼紀錄</h2><div id="aLedger" class="scroll"></div></div>
     </section>
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div class="afk" id="afk" hidden><div class="box"><h2>已自動斷線</h2><p class="note">你已經 5 分鐘沒有動作，為了節省伺服器時數，已經自動斷線。</p><button class="btn pri" type="button" id="afkBack">重新連線</button></div></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -418,7 +424,7 @@ function connect(){
   sock=io({auth:{token}});
   sock.on('connect',()=>{$('#v-auth').hidden=true;$('#app').hidden=false;$('#meBox').hidden=false;$('#conn').hidden=true;if(table&&view==='table')sock.emit('join',{tid:table.id})});
   sock.on('connect_error',e=>{if(e.message==='auth'){sock.close();try{localStorage.removeItem('nn-token')}catch(x){}$('#app').hidden=true;$('#meBox').hidden=true;$('#v-auth').hidden=false;$('#aErr').textContent='請重新登入'}else $('#conn').hidden=false});
-  sock.on('disconnect',()=>$('#conn').hidden=false);
+  sock.on('disconnect',r=>{$('#conn').hidden=false;if(r==='io server disconnect'&&$('#afk').hidden)setTimeout(()=>sock&&!sock.connected&&sock.connect(),1500)});
   sock.on('me',d=>{if(!d)return;me=d;renderMe();renderChips();renderTable()});
   sock.on('lobby',d=>{lobby=d;renderLobby();renderAdmin()});
   sock.on('table',d=>{if(view!=='table'||(table&&table.id&&d.id!==table.id))return;table=d;skew=Date.now()-d.now;renderTable()});
@@ -793,6 +799,24 @@ document.addEventListener('change',e=>{if(!sock)return;const t=e.target;
   if(t.id==='grabSel'){sock.emit('setGrab',{sec:+t.value});return}
   if(t.id==='serSel'){sock.emit('setSeries',{n:+t.value});return}
   if(t.dataset.base)sock.emit('editTable',{tid:t.dataset.base,base:+t.value})});
+// ---------- 資料備份 ----------
+$('#bkDown').onclick=async()=>{const m=$('#bkMsg');m.textContent='準備備份中…';try{const r=await fetch('/api/backup',{headers:{'x-token':token}});if(!r.ok){m.textContent=(await r.json()).error||'下載失敗';return}
+  const blob=await r.blob(),name=(r.headers.get('Content-Disposition')||'').match(/filename="([^"]+)"/)?.[1]||'game-backup.json',a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  m.textContent=`已下載 ${name}（${(blob.size/1024).toFixed(1)} KB），請保存在電腦或雲端硬碟。`}catch(e){m.textContent='下載失敗：'+e.message}};
+$('#bkFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const m=$('#bkMsg');let data;try{data=JSON.parse(await f.text())}catch(x){m.textContent='讀不懂這個檔案，請選擇「下載備份」得到的 .json 檔';return}
+  if(data.type!=='naiyou-backup'){m.textContent='這不是本遊戲的備份檔';return}
+  const when=new Date(data.at).toLocaleString('zh-TW'),games=Object.keys(data.rows||{}).map(k=>k==='state'?'哪有小孩天天輸':k==='pyan-rpg'?'屁眼王國大冒險':k).join('、');
+  if(!confirm(`確定要還原 ${when} 的備份嗎？\n包含：${games}\n\n目前資料庫裡的資料會被備份內容取代，所有人會被暫時斷線。建議在沒有人玩的時候操作。`))return;
+  m.textContent='還原中…';try{const r=await fetch('/api/restore',{method:'POST',headers:{'Content-Type':'application/json','x-token':token},body:JSON.stringify(data)});const j=await r.json();
+    if(!r.ok){m.textContent=j.error||'還原失敗';return}m.textContent=`還原完成：${j.users} 個帳號。屁眼王國大冒險會在 15 秒內自動重新載入。頁面即將重新整理…`;setTimeout(()=>location.reload(),2500)}catch(x){m.textContent='還原失敗：'+x.message}};
+// ---------- 掛機 5 分鐘自動斷線（節省伺服器時數） ----------
+{let last=Date.now(),warned=false;const act=()=>{last=Date.now();warned=false};['pointerdown','keydown','touchstart','wheel'].forEach(ev=>addEventListener(ev,act,{passive:true}));
+  setInterval(()=>{if(!sock||!sock.connected)return;const idle=Date.now()-last;
+    // 坐在還沒打完的牛牛／推筒子牌局裡不斷線，避免被扣中途離座罰金
+    const inSeries=table&&table.seats&&me&&table.game!=='holdem'&&table.seriesNo>0&&table.seats.some(x=>x.uid===me.id);if(inSeries)return;
+    if(idle>270000&&!warned){warned=true;toast('30 秒後會因為掛機自動斷線，動一下就能繼續')}
+    if(idle>300000){sock.disconnect();$('#afk').hidden=false}},5000);
+  $('#afkBack').onclick=()=>{last=Date.now();warned=false;$('#afk').hidden=true;if(sock)sock.connect()}}
 $('#reqForm').onsubmit=e=>{e.preventDefault();sock&&sock.emit('request',{amount:+$('#reqAmt').value,note:$('#reqNote').value});$('#reqNote').value=''};
 $('#newTable').onsubmit=e=>{e.preventDefault();sock&&sock.emit('createTable',{name:$('#ntName').value,base:+$('#ntBase').value,game:$('#ntGame').value});$('#ntName').value=''};
 }
